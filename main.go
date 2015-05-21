@@ -1,19 +1,43 @@
 package main
 
 import (
-  "fmt"
+	"os"
+	"./pgmgr"
+	"github.com/codegangsta/cli"
 )
 
 func main() {
-  printHelpMessage()
-}
+	app := cli.NewApp()
 
-func printHelpMessage() {
-  fmt.Println("pgmgr - a Postgres-targeted database manager for your web app");
-  fmt.Println("");
-  fmt.Println("Usage: pgmgr [command]");
-  fmt.Println("Available commands:");
-  fmt.Println("  db create              Creates the database");
-  fmt.Println("  db drop                Drops the database");
-  fmt.Println("  help");
+	app.Name  = "pgmgr"
+	app.Usage = "manage your app's Postgres database"
+
+	app.Flags = []cli.Flag {
+		cli.StringFlag{
+			Name:  "config-file, c",
+			Value: ".pgmgr.json",
+			Usage: "set the path to the JSON configuration file specifying your DB parameters",
+		},
+	}
+
+	app.Commands = []cli.Command{
+		{
+			Name:      "db",
+			Usage:     "manage your database. use 'pgmgr db help' for more info",
+			Subcommands: []cli.Command{
+				{
+					Name: "create",
+					Usage: "creates the database if it doesn't exist",
+					Action: func(c *cli.Context) {
+						pgmgr.Create("foodb")
+					},
+				},
+			},
+		},
+	}
+
+	app.Action = func(c *cli.Context) {
+		println("boom! I say!")
+	}
+	app.Run(os.Args)
 }
