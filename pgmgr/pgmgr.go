@@ -26,11 +26,11 @@ func Drop(c *Config) error {
 }
 
 func Dump(c *Config) error {
-	return sh("pg_dump", []string{"-f", c.DumpFile})
+	return sh("pg_dump", []string{"-f", c.DumpFile, c.Database})
 }
 
 func Load(c *Config) error {
-	return sh("psql", []string{"-f", c.DumpFile})
+	return sh("psql", []string{"-d", c.Database, "-f", c.DumpFile})
 }
 
 func sh(command string, args []string) error {

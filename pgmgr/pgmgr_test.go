@@ -49,7 +49,7 @@ func TestDrop(t *testing.T) {
 func TestDump(t *testing.T) {
 	sh(t, "dropdb", []string{"testdb"})
 	sh(t, "createdb", []string{"testdb"})
-	sh(t, "psql", []string{"-c","CREATE TABLE bars (bar_id INTEGER);"})
+	sh(t, "psql", []string{"-d", "testdb", "-c","CREATE TABLE bars (bar_id INTEGER);"})
 
 	err := pgmgr.Dump(globalConfig())
 
@@ -85,7 +85,7 @@ func TestLoad(t *testing.T) {
 		t.Fatal("Could not load database from file")
 	}
 
-	err = sh(t, "psql", []string{"-c","SELECT * FROM foos;"})
+	err = sh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; schema didn't load, probably")
