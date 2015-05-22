@@ -14,6 +14,7 @@ func globalConfig() *pgmgr.Config {
 		Host:			"localhost",
 		Port:			5432,
 		DumpFile: "/tmp/dump.sql",
+		MigrationFolder: "/tmp/migrations/",
 	}
 }
 
@@ -89,6 +90,42 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; schema didn't load, probably")
+	}
+}
+
+func TestMigrate(t *testing.T) {
+	sh(t, "dropdb", []string{"testdb"})
+	sh(t, "createdb", []string{"testdb"})
+	sh(t, "mkdir", []string{"/tmp/migrations"})
+
+	ioutil.WriteFile("/tmp/migrations/001_this_is_a_migration.up.sql", []byte(`
+		CREATE TABLE foos (foo_id INTEGER);
+		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
+	`), 0644)
+
+	ioutil.WriteFile("/tmp/migrations/001_this_is_a_migration.down.sql", []byte(`
+		DROP TABLE foos;
+	`), 0644)
+
+	err := pgmgr.Migrate(globalConfig())
+
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Migrations failed to run.")
+	}
+
+	err = sh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Could not query the table; migration didn't apply, probably")
+	}
+
+	err = pgmgr.Rollback(globalConfig())
+
+	err = sh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
+	if err == nil {
+		t.Log(err)
+		t.Fatal("Could query the table; migration didn't downgrade")
 	}
 }
 
