@@ -29,7 +29,14 @@ func main() {
 					Name: "create",
 					Usage: "creates the database if it doesn't exist",
 					Action: func(c *cli.Context) {
-						pgmgr.Create("foodb")
+						pgmgr.Create()
+					},
+				},
+				{
+					Name: "version",
+					Usage: "returns the current schema version",
+					Action: func(c *cli.Context) {
+						pgmgr.Version()
 					},
 				},
 			},

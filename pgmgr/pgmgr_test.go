@@ -93,6 +93,32 @@ func TestLoad(t *testing.T) {
 	}
 }
 
+func TestVersion(t *testing.T) {
+	sh(t, "dropdb", []string{"testdb"})
+	sh(t, "createdb", []string{"testdb"})
+
+	version, err := pgmgr.Version(globalConfig())
+
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Could not fetch version info")
+	}
+
+	if version != 0 {
+		t.Fatal("expected version to be zero, got", version)
+	}
+
+	pgmgr.Initialize(globalConfig())
+
+	sh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES (1);"})
+
+	version, err = pgmgr.Version(globalConfig())
+
+	if version != 1 {
+		t.Fatal("expected version to be 1, got", version)
+	}
+}
+
 func TestMigrate(t *testing.T) {
 	sh(t, "dropdb", []string{"testdb"})
 	sh(t, "createdb", []string{"testdb"})

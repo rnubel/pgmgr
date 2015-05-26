@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
+	"database/sql"
+	_ "github.com/lib/pq"
 )
 
 type Config struct {
@@ -68,6 +70,54 @@ func Rollback(c *Config) error {
 	}
 
 	return nil
+}
+
+func Version(c *Config) (int, error) {
+	db, err := openConnection(c)
+	if err != nil {
+		return -1, err
+	}
+
+	// if the table doesn't exist, we're simply at version zero
+	hasTable := false
+	err = db.QueryRow("SELECT true FROM pg_catalog.pg_tables WHERE tablename='schema_migrations'").Scan(&hasTable)
+	if hasTable == false {
+		return 0, nil
+  }
+
+	// if the query fails, return zero. probably means the table is empty
+	version := 0
+	db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version)
+
+	return version, nil
+}
+
+func Initialize(c *Config) error {
+	db, err := openConnection(c)
+	if err != nil {
+		return err
+	}
+
+  err = db.QueryRow("CREATE TABLE schema_migrations (version INTEGER NOT NULL)").Scan()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func openConnection(c *Config) (*sql.DB, error) {
+	db, err := sql.Open("postgres", sqlConnectionString(c))
+	return db, err
+}
+
+func sqlConnectionString(c * Config) string {
+	return fmt.Sprint(
+		" user='"			, c.Username, "'",
+		" dbname='"		, c.Database, "'",
+		" password='"	, c.Password, "'",
+		" host='"			, c.Host, "'",
+		" sslmode="		, "disable")
 }
 
 func migrationFiles(c *Config, direction string) ([]string, error) {
