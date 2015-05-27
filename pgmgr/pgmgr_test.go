@@ -140,6 +140,12 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Migrations failed to run.")
 	}
 
+	err = pgmgr.Migrate(globalConfig())
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Running migrations again was not idempotent!")
+	}
+
 	err = sh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
 	if err != nil {
 		t.Log(err)

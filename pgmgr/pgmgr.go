@@ -2,6 +2,7 @@ package pgmgr
 
 import (
 	"fmt"
+	"strconv"
 	"os/exec"
 	"io/ioutil"
 	"path/filepath"
@@ -23,6 +24,11 @@ type Config struct {
 	MigrationFolder	string
 }
 
+type Migration struct {
+	Filename string
+	Version	int
+}
+
 func Create(c *Config) error {
 	return sh("createdb", []string{c.Database})
 }
@@ -40,15 +46,22 @@ func Load(c *Config) error {
 }
 
 func Migrate(c *Config) error {
-	files, err := migrationFiles(c, "up")
+	migrations, err := migrations(c, "up")
 	if err != nil {
 		return err
 	}
 
-	for _, file := range files {
-		err = sh("psql", []string{"-d", c.Database, "-f", filepath.Join(c.MigrationFolder, file)})
-		if err != nil { // halt the migration process and return the error.
-			return err
+	currentVersion, err := getOrInitializeVersion(c)
+	if err != nil {
+		return err
+	}
+
+	for _, m := range migrations {
+		if m.Version > currentVersion {
+			err = sh("psql", []string{"-d", c.Database, "-f", filepath.Join(c.MigrationFolder, m.Filename)})
+			if err != nil { // halt the migration process and return the error.
+				return err
+			}
 		}
 	}
 
@@ -56,15 +69,27 @@ func Migrate(c *Config) error {
 }
 
 func Rollback(c *Config) error {
-	// TODO: we should probably rollback the latest version, not just the last .down file.
-	files, err := migrationFiles(c, "down")
+	migrations, err := migrations(c, "down")
 	if err != nil {
 		return err
 	}
 
+	v, _ := Version(c)
+	to_rollback := Migration{}
+	for _, m := range migrations {
+		if m.Version == v {
+			to_rollback = m
+			break
+		}
+	}
+
+	if to_rollback == (Migration{}) {
+		return nil
+	}
+
 	// rollback only the last migration
-	to_rollback := files[len(files) - 1]
-	err = sh("psql", []string{"-d", c.Database, "-f", filepath.Join(c.MigrationFolder, to_rollback)})
+	err = sh("psql", []string{"-d", c.Database,
+													  "-f", filepath.Join(c.MigrationFolder, to_rollback.Filename)})
 	if err != nil {
 		return err
 	}
@@ -106,6 +131,17 @@ func Initialize(c *Config) error {
 	return nil
 }
 
+func getOrInitializeVersion(c *Config) (int, error) {
+	var v int
+	if v, _ := Version(c); v == 0 {
+		if err := Initialize(c); err != nil {
+			return -1, err
+		}
+	}
+
+	return v, nil
+}
+
 func openConnection(c *Config) (*sql.DB, error) {
 	db, err := sql.Open("postgres", sqlConnectionString(c))
 	return db, err
@@ -120,16 +156,18 @@ func sqlConnectionString(c * Config) string {
 		" sslmode="		, "disable")
 }
 
-func migrationFiles(c *Config, direction string) ([]string, error) {
+func migrations(c *Config, direction string) ([]Migration, error) {
 	files, err := ioutil.ReadDir(c.MigrationFolder)
-	migrations := []string{}
+	migrations := []Migration{}
 	if err != nil {
-		return []string{}, err
+		return []Migration{}, err
 	}
 
 	for _, file := range files {
 		if match, _ := regexp.MatchString("[0-9]+_.+." + direction + ".sql", file.Name()); match {
-			migrations = append(migrations, file.Name())
+			re := regexp.MustCompile("^[0-9]+")
+			version, _ := strconv.Atoi(re.FindString(file.Name()))
+			migrations = append(migrations, Migration{Filename: file.Name(), Version: version})
 		}
 	}
 
