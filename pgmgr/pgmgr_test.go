@@ -104,13 +104,13 @@ func TestVersion(t *testing.T) {
 		t.Fatal("Could not fetch version info")
 	}
 
-	if version != 0 {
-		t.Fatal("expected version to be zero, got", version)
+	if version != -1 {
+		t.Fatal("expected version to be -1 before table exists, got", version)
 	}
 
 	pgmgr.Initialize(globalConfig())
 
-	sh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES (1);"})
+	sh(t, "psql", []string{"-e", "-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES (1)"})
 
 	version, err = pgmgr.Version(globalConfig())
 
@@ -120,16 +120,19 @@ func TestVersion(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
+	// start with an empty DB
 	sh(t, "dropdb", []string{"testdb"})
 	sh(t, "createdb", []string{"testdb"})
+	sh(t, "rm", []string{"-r", "/tmp/migrations"})
 	sh(t, "mkdir", []string{"/tmp/migrations"})
 
-	ioutil.WriteFile("/tmp/migrations/001_this_is_a_migration.up.sql", []byte(`
+	// add our first migration
+	ioutil.WriteFile("/tmp/migrations/002_this_is_a_migration.up.sql", []byte(`
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
 	`), 0644)
 
-	ioutil.WriteFile("/tmp/migrations/001_this_is_a_migration.down.sql", []byte(`
+	ioutil.WriteFile("/tmp/migrations/002_this_is_a_migration.down.sql", []byte(`
 		DROP TABLE foos;
 	`), 0644)
 
@@ -140,6 +143,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Migrations failed to run.")
 	}
 
+	// test simple idempotency
 	err = pgmgr.Migrate(globalConfig())
 	if err != nil {
 		t.Log(err)
@@ -152,6 +156,25 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Could not query the table; migration didn't apply, probably")
 	}
 
+	// add a new migration with an older version, as if another dev's branch was merged in
+	ioutil.WriteFile("/tmp/migrations/001_this_is_an_older_migration.up.sql", []byte(`
+		CREATE TABLE bars (bar_id INTEGER);
+		INSERT INTO bars (bar_id) VALUES (4), (5), (6);
+	`), 0644)
+
+	err = pgmgr.Migrate(globalConfig())
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Could not apply second migration!")
+	}
+
+	err = sh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM bars;"})
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Could not query the table; second migration didn't apply, probably")
+	}
+
+	// rollback the initial migration, since it has the latest version
 	err = pgmgr.Rollback(globalConfig())
 
 	err = sh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
