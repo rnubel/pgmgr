@@ -1,33 +1,33 @@
 package pgmgr
 
 import (
-	"fmt"
+	"database/sql"
 	"errors"
-	"strconv"
-	"os/exec"
+	"fmt"
+	"github.com/lib/pq"
 	"io/ioutil"
+	"os/exec"
 	"path/filepath"
 	"regexp"
-	"database/sql"
-	"github.com/lib/pq"
+	"strconv"
 )
 
 type Config struct {
 	// connection
-	Username	string
-	Password	string
-	Database	string
-	Host			string
-	Port			int
+	Username string
+	Password string
+	Database string
+	Host     string
+	Port     int
 
 	// filepaths
-	DumpFile	string
-	MigrationFolder	string
+	DumpFile        string
+	MigrationFolder string
 }
 
 type Migration struct {
 	Filename string
-	Version	int
+	Version  int
 }
 
 // Creates the database specified by the configuration.
@@ -96,7 +96,7 @@ func Rollback(c *Config) error {
 
 	// rollback only the last migration
 	err = sh("psql", []string{"-d", c.Database,
-													  "-f", filepath.Join(c.MigrationFolder, to_rollback.Filename)})
+		"-f", filepath.Join(c.MigrationFolder, to_rollback.Filename)})
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func Version(c *Config) (int, error) {
 	err = db.QueryRow("SELECT true FROM pg_catalog.pg_tables WHERE tablename='schema_migrations'").Scan(&hasTable)
 	if hasTable != true {
 		return -1, nil
-  }
+	}
 
 	var version int
 	err = db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version)
@@ -136,7 +136,7 @@ func Initialize(c *Config) error {
 		return err
 	}
 
-  _, err = db.Exec("CREATE TABLE schema_migrations (version INTEGER NOT NULL)")
+	_, err = db.Exec("CREATE TABLE schema_migrations (version INTEGER NOT NULL)")
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func migrationIsApplied(c *Config, version int) (bool, error) {
 	}
 
 	var is_applied bool
-  err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1);", version).Scan(&is_applied)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1);", version).Scan(&is_applied)
 	if err != nil {
 		return false, err
 	}
@@ -221,13 +221,13 @@ func openConnection(c *Config) (*sql.DB, error) {
 	return db, err
 }
 
-func sqlConnectionString(c * Config) string {
+func sqlConnectionString(c *Config) string {
 	return fmt.Sprint(
-		" user='"			, c.Username, "'",
-		" dbname='"		, c.Database, "'",
-		" password='"	, c.Password, "'",
-		" host='"			, c.Host, "'",
-		" sslmode="		, "disable")
+		" user='", c.Username, "'",
+		" dbname='", c.Database, "'",
+		" password='", c.Password, "'",
+		" host='", c.Host, "'",
+		" sslmode=", "disable")
 }
 
 func migrations(c *Config, direction string) ([]Migration, error) {
@@ -238,7 +238,7 @@ func migrations(c *Config, direction string) ([]Migration, error) {
 	}
 
 	for _, file := range files {
-		if match, _ := regexp.MatchString("[0-9]+_.+." + direction + ".sql", file.Name()); match {
+		if match, _ := regexp.MatchString("[0-9]+_.+."+direction+".sql", file.Name()); match {
 			re := regexp.MustCompile("^[0-9]+")
 			version, _ := strconv.Atoi(re.FindString(file.Name()))
 			migrations = append(migrations, Migration{Filename: file.Name(), Version: version})

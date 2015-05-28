@@ -44,7 +44,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) {
-		println("boom! I say!")
+		println("")
 	}
 	app.Run(os.Args)
 }
