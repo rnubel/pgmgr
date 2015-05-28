@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 type Config struct {
@@ -142,6 +143,32 @@ func Initialize(c *Config) error {
 	}
 
 	return nil
+}
+
+
+// Creates new, blank migration files.
+func CreateMigration(c *Config, name string) error {
+	version := generateVersion()
+	up_filepath   := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
+	down_filepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".down.sql"))
+
+	err := ioutil.WriteFile(up_filepath, []byte(`-- Migration goes here.`), 0644)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(down_filepath, []byte(`-- Rollback of migration goes here. If you don't want to write it, delete this file.`), 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func generateVersion() int {
+	// TODO: guarantee no conflicts by incrementing if there is a conflict
+	v, _ := strconv.Atoi(time.Now().Format("2006010215150405"))
+	return v
 }
 
 func applyMigration(c *Config, m Migration) error {

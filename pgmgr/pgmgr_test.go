@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"io/ioutil"
 	"strings"
+	"time"
+	"fmt"
 )
 
 func globalConfig() *pgmgr.Config {
@@ -181,6 +183,27 @@ func TestMigrate(t *testing.T) {
 	if err == nil {
 		t.Log(err)
 		t.Fatal("Could query the table; migration didn't downgrade")
+	}
+}
+
+func TestCreateMigration(t *testing.T) {
+	sh(t, "rm", []string{"-r", "/tmp/migrations"})
+	sh(t, "mkdir", []string{"/tmp/migrations"})
+
+	expectedVersion := time.Now().Format("2006010215150405")
+	err := pgmgr.CreateMigration(globalConfig(), "new_migration")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = sh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedVersion, "_new_migration.up.sql")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = sh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedVersion, "_new_migration.down.sql")})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
