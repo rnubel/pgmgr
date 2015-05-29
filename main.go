@@ -2,7 +2,9 @@ package main
 
 import (
 	"os"
-	"./pgmgr"
+	"io/ioutil"
+	"encoding/json"
+	"github.com/rnubel/pgmgr/pgmgr"
 	"github.com/codegangsta/cli"
 )
 
@@ -65,17 +67,35 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
-		// TODO: load configuration from file first; then override with
-		// flags or env vars.
+		// load configuration from file first; then override with
+		// flags or env vars if they're present.
+		configFile := c.String("config-file")
+		contents, err := ioutil.ReadFile(configFile)
+		if err == nil {
+			json.Unmarshal(contents, &config)
+		}
 
-		config.Username = c.String("username")
-		config.Password = c.String("password")
-		config.Database = c.String("database")
-		config.Host     = c.String("host")
-		config.Port     = c.Int("port")
-
-		config.DumpFile = c.String("dump-file")
-		config.MigrationFolder = c.String("migration-folder")
+		if c.String("username") != "" {
+			config.Username = c.String("username")
+		}
+		if c.String("password") != "" {
+			config.Username = c.String("password")
+		}
+		if c.String("database") != "" {
+			config.Database = c.String("database")
+		}
+		if c.String("host") != "" {
+			config.Host = c.String("host")
+		}
+		if c.Int("port") != 0 {
+			config.Port = c.Int("port")
+		}
+		if c.String("dump-file") != "" {
+			config.DumpFile = c.String("dump-file")
+		}
+		if c.String("migration-folder") != "" {
+			config.MigrationFolder = c.String("migration-folder")
+		}
 
 		return nil
 	}
@@ -150,7 +170,8 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) {
-		println("")
+		app.Command("help").Run(c)
 	}
+
 	app.Run(os.Args)
 }
