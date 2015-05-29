@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -24,6 +25,9 @@ type Config struct {
 	// filepaths
 	DumpFile        string
 	MigrationFolder string
+
+	// options
+	SeedTables	[]string
 }
 
 type Migration struct {
@@ -43,7 +47,35 @@ func Drop(c *Config) error {
 
 // Dumps the schema and contents of the database to the dump file.
 func Dump(c *Config) error {
-	return sh("pg_dump", []string{"-f", c.DumpFile, c.Database})
+	// dump schema first...
+	schema, err := shRead("pg_dump", []string{"--schema-only", c.Database})
+	if err != nil {
+		return err
+	}
+
+	// then selected data...
+	args := []string{"--data-only", c.Database}
+	if len(c.SeedTables) > 0 {
+		for _, table := range(c.SeedTables) {
+			args = append(args, "-t", table)
+		}
+	}
+	seeds, err := shRead("pg_dump", args)
+	if err != nil {
+		return err
+	}
+
+	// and combine into one file.
+	file, err := os.OpenFile(c.DumpFile, os.O_CREATE | os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+
+	file.Write(*schema)
+	file.Write(*seeds)
+	file.Close()
+
+	return nil
 }
 
 // Loads the database from the dump file.
@@ -284,4 +316,10 @@ func sh(command string, args []string) error {
 	}
 
 	return nil
+}
+
+func shRead(command string, args []string) (*[]byte, error) {
+	c := exec.Command(command, args...)
+	output, err := c.CombinedOutput()
+	return &output, err
 }

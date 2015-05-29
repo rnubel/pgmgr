@@ -15,6 +15,8 @@ func main() {
 	app.Name  = "pgmgr"
 	app.Usage = "manage your app's Postgres database"
 
+	s := make([]string, 0)
+
 	app.Flags = []cli.Flag {
 		cli.StringFlag{
 			Name:  "config-file, c",
@@ -64,6 +66,12 @@ func main() {
 			Usage: "folder containing the migrations to apply",
 			EnvVar: "PGMGR_MIGRATION_FOLDER",
 		},
+		cli.StringSliceFlag{
+			Name:  "seed-tables",
+			Value: (*cli.StringSlice)(&s),
+			Usage: "list of tables (or globs matching table names) to dump the data of",
+			EnvVar: "PGMGR_SEED_TABLES",
+		},
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -95,6 +103,9 @@ func main() {
 		}
 		if c.String("migration-folder") != "" {
 			config.MigrationFolder = c.String("migration-folder")
+		}
+		if c.StringSlice("seed-tables") != nil && len(c.StringSlice("seed-tables")) > 0 {
+			config.SeedTables = c.StringSlice("seed-tables")
 		}
 
 		return nil
