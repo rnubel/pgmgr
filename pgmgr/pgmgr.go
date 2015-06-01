@@ -22,6 +22,7 @@ type Config struct {
 	Database string
 	Host     string
 	Port     int
+	Url      string
 
 	// filepaths
 	DumpFile        string	`json:"dump-file"`

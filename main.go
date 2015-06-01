@@ -6,7 +6,19 @@ import (
 	"encoding/json"
 	"github.com/rnubel/pgmgr/pgmgr"
 	"github.com/codegangsta/cli"
+	"regexp"
+	"strconv"
+	"fmt"
 )
+
+func displayErrorOrMessage(err error, args... interface{}) {
+	if err != nil {
+		fmt.Println(os.Stderr, "Error: ", err)
+		os.Exit(1)
+	} else {
+		fmt.Println(args...)
+	}
+}
 
 func main() {
 	config := &pgmgr.Config{}
@@ -56,6 +68,12 @@ func main() {
 			EnvVar: "PGMGR_PORT",
 		},
 		cli.StringFlag{
+			Name: "url",
+			Value: "",
+			Usage: "connection URL or DSN containing connection info; will override the other params if given",
+			EnvVar: "PGMGR_URL",
+		},
+		cli.StringFlag{
 			Name:  "dump-file",
 			Value: "db/dump.sql",
 			Usage: "where to dump or load the database structure and contents to or from",
@@ -82,13 +100,15 @@ func main() {
 		contents, err := ioutil.ReadFile(configFile)
 		if err == nil {
 			json.Unmarshal(contents, &config)
+		} else {
+			fmt.Println("error reading config file: ", err)
 		}
 
 		if c.String("username") != "" {
 			config.Username = c.String("username")
 		}
 		if c.String("password") != "" {
-			config.Username = c.String("password")
+			config.Password = c.String("password")
 		}
 		if c.String("database") != "" {
 			config.Database = c.String("database")
@@ -99,6 +119,25 @@ func main() {
 		if c.Int("port") != 0 {
 			config.Port = c.Int("port")
 		}
+		if c.String("url") != "" {
+			config.Url = c.String("url")
+		}
+
+		if config.Url != "" { // TODO: move this into pgmgr, probably?
+			// parse the DSN and populate the other configuration values. Some of the pg commands
+			// accept a DSN parameter, but not all, so this will help unify things.
+			r := regexp.MustCompile("^postgres://(.*)@(.*):([0-9]+)/([a-zA-Z0-9_-]+)")
+			m := r.FindStringSubmatch(config.Url)
+			if len(m) > 0 {
+				config.Username = m[1]
+				config.Host = m[2]
+				config.Port, _ = strconv.Atoi(m[3])
+				config.Database = m[4]
+			} else {
+			  println("Could not parse DSN:  ", config.Url, " using regex ", r)
+			}
+		}
+
 		if c.String("dump-file") != "" {
 			config.DumpFile = c.String("dump-file")
 		}
@@ -125,6 +164,13 @@ func main() {
 			},
 		},
 		{
+			Name: "config",
+			Usage: "displays the current configuration as seen by pgmgr",
+			Action: func(c *cli.Context) {
+				fmt.Printf("%+v\n", config)
+			},
+		},
+		{
 			Name: "db",
 			Usage: "manage your database. use 'pgmgr db help' for more info",
 			Subcommands: []cli.Command{
@@ -146,21 +192,27 @@ func main() {
 					Name: "dump",
 					Usage: "dumps the database schema and contents to the dump file (see --dump-file)",
 					Action: func(c *cli.Context) {
-						pgmgr.Dump(config)
+						err := pgmgr.Dump(config)
+						displayErrorOrMessage(err, "Database dumped to", config.DumpFile, "successfully")
 					},
 				},
 				{
 					Name: "load",
 					Usage: "loads the database schema and contents from the dump file (see --dump-file)",
 					Action: func(c *cli.Context) {
-						pgmgr.Load(config)
+						err := pgmgr.Load(config)
+						displayErrorOrMessage(err, "Database loaded successfully.")
+
+						v, err := pgmgr.Version(config)
+						displayErrorOrMessage(err, "Latest migration version: ", v)
 					},
 				},
 				{
 					Name: "version",
 					Usage: "returns the current schema version",
 					Action: func(c *cli.Context) {
-						pgmgr.Version(config)
+						v, err := pgmgr.Version(config)
+						displayErrorOrMessage(err, "Latest migration version: ", v)
 					},
 				},
 				{
