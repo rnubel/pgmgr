@@ -53,8 +53,12 @@ func TestDump(t *testing.T) {
 	sh(t, "dropdb", []string{"testdb"})
 	sh(t, "createdb", []string{"testdb"})
 	sh(t, "psql", []string{"-d", "testdb", "-c","CREATE TABLE bars (bar_id INTEGER);"})
+	sh(t, "psql", []string{"-d", "testdb", "-c","INSERT INTO bars (bar_id) VALUES (123), (456);"})
+	sh(t, "psql", []string{"-d", "testdb", "-c","CREATE TABLE foos (foo_id INTEGER);"})
+	sh(t, "psql", []string{"-d", "testdb", "-c","INSERT INTO foos (foo_id) VALUES (789);"})
 
-	err := pgmgr.Dump(globalConfig())
+	c := globalConfig()
+	err := pgmgr.Dump(c)
 
 	if err != nil {
 		t.Log(err)
@@ -69,6 +73,32 @@ func TestDump(t *testing.T) {
 
 	if !strings.Contains(string(file), "CREATE TABLE bars") {
 		t.Fatal("dump does not contain the table definition")
+	}
+
+	if !strings.Contains(string(file), "123") {
+		t.Fatal("dump does not contain the table data when --seed-tables is not specified")
+	}
+
+	c.SeedTables = append(c.SeedTables, "foos")
+	err = pgmgr.Dump(c)
+
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Could not dump database to file")
+	}
+
+	file, err = ioutil.ReadFile("/tmp/dump.sql")
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Could not read dump")
+	}
+
+	if strings.Contains(string(file), "123") {
+		t.Fatal("dump contains table data for non-seed tables, when --seed-tables was given")
+	}
+
+	if !strings.Contains(string(file), "789") {
+		t.Fatal("dump does not contain table data for seed tables, when --seed-tables was given")
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,11 +24,11 @@ type Config struct {
 	Port     int
 
 	// filepaths
-	DumpFile        string
-	MigrationFolder string
+	DumpFile        string	`json:"dump-file"`
+	MigrationFolder string	`json:"migration-folder"`
 
 	// options
-	SeedTables	[]string
+	SeedTables	[]string	`json:"seed-tables"`
 }
 
 type Migration struct {
@@ -54,19 +55,22 @@ func Dump(c *Config) error {
 	}
 
 	// then selected data...
-	args := []string{"--data-only", c.Database}
+	args := []string{c.Database, "--data-only"}
 	if len(c.SeedTables) > 0 {
 		for _, table := range(c.SeedTables) {
+		  println("pulling data for", table)
 			args = append(args, "-t", table)
 		}
 	}
+	println(strings.Join(args, ""))
+
 	seeds, err := shRead("pg_dump", args)
 	if err != nil {
 		return err
 	}
 
 	// and combine into one file.
-	file, err := os.OpenFile(c.DumpFile, os.O_CREATE | os.O_WRONLY, 0600)
+	file, err := os.OpenFile(c.DumpFile, os.O_CREATE | os.O_TRUNC | os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}
@@ -115,15 +119,15 @@ func Rollback(c *Config) error {
 	}
 
 	v, _ := Version(c)
-	to_rollback := Migration{}
+	var to_rollback *Migration
 	for _, m := range migrations {
 		if m.Version == v {
-			to_rollback = m
+			to_rollback = &m
 			break
 		}
 	}
 
-	if to_rollback == (Migration{}) {
+	if to_rollback == nil {
 		return nil
 	}
 

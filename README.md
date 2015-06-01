@@ -30,7 +30,9 @@ variable `PGMGR_CONFIG_FILE`. It should look something like:
   "port": 5432,
   "username": "test",
   "password": "test",
-  "database": "testdb"
+  "database": "testdb",
+	"dump_file": "db/dump.sql",
+	"seed_tables": [ "foos", "bars" ]
 }
 ```
 
@@ -44,6 +46,8 @@ The values above map to these environment variables:
 * `PGMGR_USERNAME`
 * `PGMGR_PASSWORD`
 * `PGMGR_DATABASE`
+* `PGMGR_DUMP_FILE` (the filepath to dump the database definition out to)
+* `PGMGR_SEED_TABLES` (tables to include data with when dumping the database)
 
 If you prefer to use a connection string, you can set `PGMGR_URL`, e.g.:
 
@@ -51,10 +55,6 @@ If you prefer to use a connection string, you can set `PGMGR_URL`, e.g.:
 PGMGR_URL='postgres://test@localhost/testdb?sslmode=false&password=test'
 ```
 
-Also used:
-
-* `PGMGR_DUMP_FILE`: the filepath to dump the database definition out to
-* `PGMGR_SEED_TABLES`: tables to include data with when dumping the database
 
 ## Usage
 
