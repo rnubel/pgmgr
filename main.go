@@ -14,6 +14,7 @@ func main() {
 
 	app.Name  = "pgmgr"
 	app.Usage = "manage your app's Postgres database"
+	app.Version = "0.0.1"
 
 	s := make([]string, 0)
 
