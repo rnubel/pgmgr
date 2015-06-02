@@ -57,13 +57,13 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "host, H",
-			Value: "localhost",
+			Value: "",
 			Usage: "the host which pgmgr will connect to",
 			EnvVar: "PGMGR_HOST",
 		},
 		cli.IntFlag{
 			Name:  "port, p",
-			Value: 5432,
+			Value: 0,
 			Usage: "the port which pgmgr will connect to",
 			EnvVar: "PGMGR_PORT",
 		},
@@ -75,13 +75,13 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "dump-file",
-			Value: "db/dump.sql",
+			Value: "",
 			Usage: "where to dump or load the database structure and contents to or from",
 			EnvVar: "PGMGR_DUMP_FILE",
 		},
 		cli.StringFlag{
 			Name:  "migration-folder",
-			Value: "db/migrate",
+			Value: "",
 			Usage: "folder containing the migrations to apply",
 			EnvVar: "PGMGR_MIGRATION_FOLDER",
 		},
@@ -104,6 +104,16 @@ func main() {
 			fmt.Println("error reading config file: ", err)
 		}
 
+		// apply some defaults
+		if config.Port == 0 {
+			config.Port = 5432
+		}
+
+		if config.Host == "" {
+			config.Host = "localhost"
+		}
+
+		// override if passed-in
 		if c.String("username") != "" {
 			config.Username = c.String("username")
 		}
@@ -116,7 +126,7 @@ func main() {
 		if c.String("host") != "" {
 			config.Host = c.String("host")
 		}
-		if c.Int("port") != 0 {
+		if c.Int("port") != 0  {
 			config.Port = c.Int("port")
 		}
 		if c.String("url") != "" {
@@ -134,7 +144,7 @@ func main() {
 				config.Port, _ = strconv.Atoi(m[3])
 				config.Database = m[4]
 			} else {
-			  println("Could not parse DSN:  ", config.Url, " using regex ", r)
+			  println("Could not parse DSN:  ", config.Url, " using regex ", r.String())
 			}
 		}
 
@@ -178,14 +188,14 @@ func main() {
 					Name: "create",
 					Usage: "creates the database if it doesn't exist",
 					Action: func(c *cli.Context) {
-						pgmgr.Create(config)
+						displayErrorOrMessage(pgmgr.Create(config), "Database", config.Database, "created successfully.")
 					},
 				},
 				{
 					Name: "drop",
 					Usage: "drops the database (all sessions must be disconnected first. this command does not force it)",
 					Action: func(c *cli.Context) {
-						pgmgr.Drop(config)
+						displayErrorOrMessage(pgmgr.Drop(config), "Database", config.Database, "dropped successfully.")
 					},
 				},
 				{

@@ -103,9 +103,17 @@ func Migrate(c *Config) error {
 
 	for _, m := range migrations {
 		if applied, _ := migrationIsApplied(c, m.Version); !applied {
+			fmt.Println("== Applying", m.Filename, "==")
+			t0 := time.Now()
+
 			if err = applyMigration(c, m); err != nil { // halt the migration process and return the error.
+				fmt.Println(err)
+				fmt.Println("")
+			  fmt.Println("ERROR! Aborting the migration process.")
 				return err
 			}
+
+			fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds() / 1e6, "ms ==")
 		}
 	}
 
@@ -135,6 +143,7 @@ func Rollback(c *Config) error {
 	// rollback only the last migration
 	err = sh("psql", []string{"-d", c.Database,
 		"-f", filepath.Join(c.MigrationFolder, to_rollback.Filename)})
+	// TODO: this needs to actually rollback the version, too. wrap in applyMigration?
 	if err != nil {
 		return err
 	}
@@ -210,6 +219,7 @@ func generateVersion() int {
 
 func applyMigration(c *Config, m Migration) error {
 	db, err := openConnection(c)
+	defer db.Close()
 	if err != nil {
 		return err
 	}
