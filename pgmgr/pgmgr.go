@@ -1,6 +1,7 @@
 package pgmgr
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -106,6 +107,7 @@ func Migrate(c *Config) error {
 		return err
 	}
 
+	appliedAny := false
 	for _, m := range migrations {
 		if applied, _ := migrationIsApplied(c, m.Version); !applied {
 			fmt.Println("== Applying", m.Filename, "==")
@@ -119,7 +121,12 @@ func Migrate(c *Config) error {
 			}
 
 			fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds() / 1e6, "ms ==")
+			appliedAny = true
 		}
+	}
+
+	if !appliedAny {
+		fmt.Println("Nothing to do; all migrations already applied.")
 	}
 
 	return nil
@@ -146,7 +153,14 @@ func Rollback(c *Config) error {
 	}
 
 	// rollback only the last migration
-	applyMigration(c, *to_rollback, DOWN)
+	fmt.Println("== Reverting", to_rollback.Filename, "==")
+	t0 := time.Now()
+
+	if err = applyMigration(c, *to_rollback, DOWN); err != nil {
+		return err
+	}
+
+	fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds() / 1e6, "ms ==")
 
 	return nil
 }
@@ -213,8 +227,18 @@ func CreateMigration(c *Config, name string) error {
 
 func generateVersion() int {
 	// TODO: guarantee no conflicts by incrementing if there is a conflict
-	v, _ := strconv.Atoi(time.Now().Format("2006010215150405"))
+	v := int(time.Now().Unix())
 	return v
+}
+
+// need access to the original query contents in order to print it out properly,
+// unfortunately.
+func formatPgErr(contents *[]byte, pgerr *pq.Error) string {
+	pos, _ := strconv.Atoi(pgerr.Position)
+	lineNo := bytes.Count((*contents)[:pos], []byte("\n")) + 1
+	columnNo := pos - bytes.LastIndex((*contents)[:pos], []byte("\n")) - 1
+
+	return fmt.Sprint("PGERROR: line ", lineNo, " pos ", columnNo, ": ", pgerr.Message, ". ", pgerr.Detail)
 }
 
 func applyMigration(c *Config, m Migration, direction int) error {
@@ -235,28 +259,19 @@ func applyMigration(c *Config, m Migration, direction int) error {
 	}
 
 	if _, err = tx.Exec(string(contents)); err != nil {
-		pgerr := err.(*pq.Error)
-
-		// trigger a rollback, if needed.
 		tx.Rollback()
-		return errors.New(fmt.Sprint("Error when applying migration ", m.Version, ": line ", pgerr.Line, " pos ", pgerr.Position, ": ", pgerr.Message, ". ", pgerr.Detail))
+		return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 	}
 
 	if direction == UP {
 		if err = insertSchemaVersion(tx, m.Version); err != nil {
-			pgerr := err.(*pq.Error)
-
-			// trigger a rollback, if needed.
 			tx.Rollback()
-			return errors.New(fmt.Sprint("Error when inserting version ", m.Version, ": line ", pgerr.Line, " pos ", pgerr.Position, ": ", pgerr.Message, ". ", pgerr.Detail))
+			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
 	} else {
 		if err = deleteSchemaVersion(tx, m.Version); err != nil {
-			pgerr := err.(*pq.Error)
-
-			// trigger a rollback, if needed.
 			tx.Rollback()
-			return errors.New(fmt.Sprint("Error when removing version ", m.Version, ": line ", pgerr.Line, " pos ", pgerr.Position, ": ", pgerr.Message, ". ", pgerr.Detail))
+			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
 	}
 

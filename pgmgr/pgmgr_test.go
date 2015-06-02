@@ -226,7 +226,7 @@ func TestCreateMigration(t *testing.T) {
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
-	expectedVersion := time.Now().Format("2006010215150405")
+	expectedVersion := time.Now().Unix()
 	err := pgmgr.CreateMigration(globalConfig(), "new_migration")
 	if err != nil {
 		t.Fatal(err)
