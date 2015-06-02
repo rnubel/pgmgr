@@ -12,6 +12,36 @@ reliable, consistent manner. Inspired by [mattes/migrate]
   there's a single, authoritative source of your database structure. It's
   recommended you regularly check this file into source control.
 
+## Getting Started
+
+First, create a `.pgmgr.json` file in your app, as described below. Then,
+generate your first migration:
+
+```
+$ pgmgr migration MyFirstMigration
+
+Created migrations/1433277961_MyFirstMigration.up.sql
+Created migrations/1433277961_MyFirstMigration.down.sql
+```
+
+Flesh it out:
+```
+$ echo 'CREATE TABLE foos (foo_id INTEGER)' > 1433277961_MyFirstMigration.up.sql
+```
+
+Bootstrap your database:
+```
+$ pgmgr db create
+Database pgmgr-test-app created successfully.
+```
+
+And apply your migration:
+```
+$ pgmgr db migrate
+== Applying 1433277961_MyFirstMigration.up.sql ==
+== Completed in 8 ms ==
+```
+
 ## Configuration
 
 `pgmgr` supports file-based configuration (useful for checking into your
@@ -31,8 +61,9 @@ variable `PGMGR_CONFIG_FILE`. It should look something like:
   "username": "test",
   "password": "test",
   "database": "testdb",
-	"dump_file": "db/dump.sql",
-	"seed_tables": [ "foos", "bars" ]
+  "migration-folder": "db/migrate",
+  "dump-file": "db/dump.sql",
+  "seed-tables": [ "foos", "bars" ]
 }
 ```
 
