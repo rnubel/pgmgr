@@ -37,6 +37,11 @@ type Migration struct {
 	Version  int
 }
 
+const (
+	DOWN = iota
+	UP   = iota
+)
+
 // Creates the database specified by the configuration.
 func Create(c *Config) error {
 	return sh("createdb", []string{c.Database})
@@ -106,7 +111,7 @@ func Migrate(c *Config) error {
 			fmt.Println("== Applying", m.Filename, "==")
 			t0 := time.Now()
 
-			if err = applyMigration(c, m); err != nil { // halt the migration process and return the error.
+			if err = applyMigration(c, m, UP); err != nil { // halt the migration process and return the error.
 				fmt.Println(err)
 				fmt.Println("")
 			  fmt.Println("ERROR! Aborting the migration process.")
@@ -141,12 +146,7 @@ func Rollback(c *Config) error {
 	}
 
 	// rollback only the last migration
-	err = sh("psql", []string{"-d", c.Database,
-		"-f", filepath.Join(c.MigrationFolder, to_rollback.Filename)})
-	// TODO: this needs to actually rollback the version, too. wrap in applyMigration?
-	if err != nil {
-		return err
-	}
+	applyMigration(c, *to_rollback, DOWN)
 
 	return nil
 }
@@ -217,7 +217,7 @@ func generateVersion() int {
 	return v
 }
 
-func applyMigration(c *Config, m Migration) error {
+func applyMigration(c *Config, m Migration, direction int) error {
 	db, err := openConnection(c)
 	defer db.Close()
 	if err != nil {
@@ -242,12 +242,22 @@ func applyMigration(c *Config, m Migration) error {
 		return errors.New(fmt.Sprint("Error when applying migration ", m.Version, ": line ", pgerr.Line, " pos ", pgerr.Position, ": ", pgerr.Message, ". ", pgerr.Detail))
 	}
 
-	if err = insertSchemaVersion(tx, m.Version); err != nil {
-		pgerr := err.(*pq.Error)
+	if direction == UP {
+		if err = insertSchemaVersion(tx, m.Version); err != nil {
+			pgerr := err.(*pq.Error)
 
-		// trigger a rollback, if needed.
-		tx.Rollback()
-		return errors.New(fmt.Sprint("Error when inserting version ", m.Version, ": line ", pgerr.Line, " pos ", pgerr.Position, ": ", pgerr.Message, ". ", pgerr.Detail))
+			// trigger a rollback, if needed.
+			tx.Rollback()
+			return errors.New(fmt.Sprint("Error when inserting version ", m.Version, ": line ", pgerr.Line, " pos ", pgerr.Position, ": ", pgerr.Message, ". ", pgerr.Detail))
+		}
+	} else {
+		if err = deleteSchemaVersion(tx, m.Version); err != nil {
+			pgerr := err.(*pq.Error)
+
+			// trigger a rollback, if needed.
+			tx.Rollback()
+			return errors.New(fmt.Sprint("Error when removing version ", m.Version, ": line ", pgerr.Line, " pos ", pgerr.Position, ": ", pgerr.Message, ". ", pgerr.Detail))
+		}
 	}
 
 	err = tx.Commit()
@@ -260,6 +270,11 @@ func applyMigration(c *Config, m Migration) error {
 
 func insertSchemaVersion(tx *sql.Tx, version int) error {
 	_, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1) RETURNING version", version)
+	return err
+}
+
+func deleteSchemaVersion(tx *sql.Tx, version int) error {
+	_, err := tx.Exec("DELETE FROM schema_migrations WHERE version = $1", version)
 	return err
 }
 

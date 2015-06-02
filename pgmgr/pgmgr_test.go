@@ -214,6 +214,12 @@ func TestMigrate(t *testing.T) {
 		t.Log(err)
 		t.Fatal("Could query the table; migration didn't downgrade")
 	}
+
+	v, err := pgmgr.Version(globalConfig())
+	if err != nil || v != 1 {
+		t.Log(err)
+		t.Fatal("Rollback did not reset version! Still on version ", v)
+	}
 }
 
 func TestCreateMigration(t *testing.T) {
