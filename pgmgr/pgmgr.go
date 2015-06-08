@@ -216,11 +216,13 @@ func CreateMigration(c *Config, name string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("Created", up_filepath)
 
 	err = ioutil.WriteFile(down_filepath, []byte(`-- Rollback of migration goes here. If you don't want to write it, delete this file.`), 0644)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Created", down_filepath)
 
 	return nil
 }
