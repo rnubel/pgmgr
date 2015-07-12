@@ -229,7 +229,11 @@ func main() {
 					Name: "migrate",
 					Usage: "applies any un-applied migrations in the migration folder (see --migration-folder)",
 					Action: func(c *cli.Context) {
-						pgmgr.Migrate(config)
+						err := pgmgr.Migrate(config)
+						if err != nil {
+							fmt.Fprintln(os.Stderr, "Error during migration:", err)
+							os.Exit(1)
+						}
 					},
 				},
 				{
