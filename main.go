@@ -13,10 +13,19 @@ import (
 
 func displayErrorOrMessage(err error, args... interface{}) {
 	if err != nil {
-		fmt.Println(os.Stderr, "Error: ", err)
+		fmt.Fprintln(os.Stderr, "Error: ", err)
 		os.Exit(1)
 	} else {
 		fmt.Println(args...)
+	}
+}
+
+func displayVersion(config *pgmgr.Config) {
+	v, err := pgmgr.Version(config)
+	if v < 0 {
+		displayErrorOrMessage(err, "Database has no schema_migrations table; run `pgmgr db migrate` to create it.")
+	} else {
+		displayErrorOrMessage(err, "Latest migration version:", v)
 	}
 }
 
@@ -212,17 +221,14 @@ func main() {
 					Action: func(c *cli.Context) {
 						err := pgmgr.Load(config)
 						displayErrorOrMessage(err, "Database loaded successfully.")
-
-						v, err := pgmgr.Version(config)
-						displayErrorOrMessage(err, "Latest migration version: ", v)
+						displayVersion(config)
 					},
 				},
 				{
 					Name: "version",
 					Usage: "returns the current schema version",
 					Action: func(c *cli.Context) {
-						v, err := pgmgr.Version(config)
-						displayErrorOrMessage(err, "Latest migration version: ", v)
+						displayVersion(config)
 					},
 				},
 				{
