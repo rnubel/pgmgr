@@ -81,12 +81,15 @@ The values above map to these environment variables:
 * `PGMGR_DUMP_FILE` (the filepath to dump the database definition out to)
 * `PGMGR_SEED_TABLES` (tables to include data with when dumping the database)
 
-If you prefer to use a connection string, you can set `PGMGR_URL`, e.g.:
+If you prefer to use a connection string, you can set `PGMGR_URL` which will supersede the other configuration settings, e.g.:
 
 ```
 PGMGR_URL='postgres://test@localhost/testdb?sslmode=false&password=test'
 ```
 
+Also, for host, port, username, password, and database, if you haven't set a
+value via the config file, CLI arguments, or environment variables, pgmgr will
+look at the standard Postgres env vars (`PGHOST`, `PGUSERNAME`, etc).
 
 ## Usage
 
