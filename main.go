@@ -2,12 +2,8 @@ package main
 
 import (
 	"os"
-	"io/ioutil"
-	"encoding/json"
 	"github.com/rnubel/pgmgr/pgmgr"
 	"github.com/codegangsta/cli"
-	"regexp"
-	"strconv"
 	"fmt"
 )
 
@@ -103,86 +99,9 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
-		// load configuration from file first; then override with
-		// flags or env vars if they're present.
-		configFile := c.String("config-file")
-		contents, err := ioutil.ReadFile(configFile)
-		if err == nil {
-			json.Unmarshal(contents, &config)
-		} else {
-			fmt.Println("error reading config file: ", err)
-		}
-
-		// apply defaults from Postgres environment variables, but allow
-		// them to be overridden in the next step
-		if os.Getenv("PGUSER") != "" {
-			config.Username = os.Getenv("PGUSER")
-		}
-		if os.Getenv("PGPASSWORD") != "" {
-			config.Password = os.Getenv("PGPASSWORD")
-		}
-		if os.Getenv("PGDATABASE") != "" {
-			config.Database = os.Getenv("PGDATABASE")
-		}
-		if os.Getenv("PGHOST") != "" {
-			config.Host = os.Getenv("PGHOST")
-		}
-		if os.Getenv("PGPORT") != "" {
-			config.Port, _ = strconv.Atoi(os.Getenv("PGPORT"))
-		}
-
-		// apply some other, sane defaults
-		if config.Port == 0 {
-			config.Port = 5432
-		}
-		if config.Host == "" {
-			config.Host = "localhost"
-		}
-
-		// override if passed-in from the CLI or via environment variables
-		if c.String("username") != "" {
-			config.Username = c.String("username")
-		}
-		if c.String("password") != "" {
-			config.Password = c.String("password")
-		}
-		if c.String("database") != "" {
-			config.Database = c.String("database")
-		}
-		if c.String("host") != "" {
-			config.Host = c.String("host")
-		}
-		if c.Int("port") != 0  {
-			config.Port = c.Int("port")
-		}
-		if c.String("url") != "" {
-			config.Url = c.String("url")
-		}
-
-		if config.Url != "" { // TODO: move this into pgmgr, probably?
-			// parse the DSN and populate the other configuration values. Some of the pg commands
-			// accept a DSN parameter, but not all, so this will help unify things.
-			r := regexp.MustCompile("^postgres://(.*)@(.*):([0-9]+)/([a-zA-Z0-9_-]+)")
-			m := r.FindStringSubmatch(config.Url)
-			if len(m) > 0 {
-				config.Username = m[1]
-				config.Host = m[2]
-				config.Port, _ = strconv.Atoi(m[3])
-				config.Database = m[4]
-			} else {
-			  println("Could not parse DSN:  ", config.Url, " using regex ", r.String())
-			}
-		}
-
-		if c.String("dump-file") != "" {
-			config.DumpFile = c.String("dump-file")
-		}
-		if c.String("migration-folder") != "" {
-			config.MigrationFolder = c.String("migration-folder")
-		}
-		if c.StringSlice("seed-tables") != nil && len(c.StringSlice("seed-tables")) > 0 {
-			config.SeedTables = c.StringSlice("seed-tables")
-		}
+		// TODO: LoadConfig should validate some basic properties of a valid config,
+		// like that the database name is set, and return an error if not.
+		pgmgr.LoadConfig(config, c)
 
 		return nil
 	}

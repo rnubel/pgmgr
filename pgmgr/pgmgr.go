@@ -16,23 +16,6 @@ import (
 	"time"
 )
 
-type Config struct {
-	// connection
-	Username string
-	Password string
-	Database string
-	Host     string
-	Port     int
-	Url      string
-
-	// filepaths
-	DumpFile        string	`json:"dump-file"`
-	MigrationFolder string	`json:"migration-folder"`
-
-	// options
-	SeedTables	[]string	`json:"seed-tables"`
-}
-
 type Migration struct {
 	Filename string
 	Version  int
