@@ -178,9 +178,9 @@ func Version(c *Config) (int, error) {
 
 	// if the table doesn't exist, we're at version -1
 	var hasTable bool
-	err = db.QueryRow("SELECT true FROM pg_catalog.pg_tables WHERE tablename='schema_migrations'").Scan(&hasTable)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE tablename='schema_migrations')").Scan(&hasTable)
 	if hasTable != true {
-		return -1, nil
+		return -1, err
 	}
 
 	var version int
