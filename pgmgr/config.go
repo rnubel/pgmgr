@@ -3,12 +3,19 @@ package pgmgr
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/codegangsta/cli"
 	"io/ioutil"
 	"os"
 	"regexp"
 	"strconv"
 )
+
+// Something that stores key-value pairs of various types,
+// e.g., cli.Context.
+type ArgumentContext interface {
+	String(string) string
+	Int(string) int
+	StringSlice(string) []string
+}
 
 type Config struct {
 	// connection
@@ -27,7 +34,7 @@ type Config struct {
 	SeedTables []string `json:"seed-tables"`
 }
 
-func LoadConfig(config *Config, ctx *cli.Context) {
+func LoadConfig(config *Config, ctx ArgumentContext) {
 	// load configuration from file first; then override with
 	// flags or env vars if they're present.
 	configFile := ctx.String("config-file")
@@ -86,7 +93,7 @@ func (config *Config) applyDefaults() {
 	}
 }
 
-func (config *Config) applyArguments(ctx *cli.Context) {
+func (config *Config) applyArguments(ctx ArgumentContext) {
 	if ctx.String("username") != "" {
 		config.Username = ctx.String("username")
 	}
