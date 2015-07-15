@@ -1,21 +1,21 @@
 package pgmgr
 
 import (
-	"testing"
 	"../pgmgr"
-	"os/exec"
-	"io/ioutil"
-	"strings"
-	"time"
 	"fmt"
+	"io/ioutil"
+	"os/exec"
+	"strings"
+	"testing"
+	"time"
 )
 
 func globalConfig() *pgmgr.Config {
 	return &pgmgr.Config{
-		Database: "testdb",
-		Host:			"localhost",
-		Port:			5432,
-		DumpFile: "/tmp/dump.sql",
+		Database:        "testdb",
+		Host:            "localhost",
+		Port:            5432,
+		DumpFile:        "/tmp/dump.sql",
 		MigrationFolder: "/tmp/migrations/",
 	}
 }
@@ -52,10 +52,10 @@ func TestDrop(t *testing.T) {
 func TestDump(t *testing.T) {
 	testSh(t, "dropdb", []string{"testdb"})
 	testSh(t, "createdb", []string{"testdb"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c","CREATE TABLE bars (bar_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c","INSERT INTO bars (bar_id) VALUES (123), (456);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c","CREATE TABLE foos (foo_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c","INSERT INTO foos (foo_id) VALUES (789);"})
+	testSh(t, "psql", []string{"-d", "testdb", "-c", "CREATE TABLE bars (bar_id INTEGER);"})
+	testSh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO bars (bar_id) VALUES (123), (456);"})
+	testSh(t, "psql", []string{"-d", "testdb", "-c", "CREATE TABLE foos (foo_id INTEGER);"})
+	testSh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO foos (foo_id) VALUES (789);"})
 
 	c := globalConfig()
 	err := pgmgr.Dump(c)
@@ -118,7 +118,7 @@ func TestLoad(t *testing.T) {
 		t.Fatal("Could not load database from file")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
+	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; schema didn't load, probably")
@@ -182,7 +182,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Running migrations again was not idempotent!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
+	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; migration didn't apply, probably")
@@ -200,7 +200,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Could not apply second migration!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM bars;"})
+	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM bars;"})
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; second migration didn't apply, probably")
@@ -209,7 +209,7 @@ func TestMigrate(t *testing.T) {
 	// rollback the initial migration, since it has the latest version
 	err = pgmgr.Rollback(globalConfig())
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c","SELECT * FROM foos;"})
+	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
 	if err == nil {
 		t.Log(err)
 		t.Fatal("Could query the table; migration didn't downgrade")

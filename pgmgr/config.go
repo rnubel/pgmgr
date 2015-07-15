@@ -1,13 +1,13 @@
 package pgmgr
 
 import (
-	"os"
-	"io/ioutil"
 	"encoding/json"
+	"fmt"
 	"github.com/codegangsta/cli"
+	"io/ioutil"
+	"os"
 	"regexp"
 	"strconv"
-	"fmt"
 )
 
 type Config struct {
@@ -20,11 +20,11 @@ type Config struct {
 	Url      string
 
 	// filepaths
-	DumpFile        string	`json:"dump-file"`
-	MigrationFolder string	`json:"migration-folder"`
+	DumpFile        string `json:"dump-file"`
+	MigrationFolder string `json:"migration-folder"`
 
 	// options
-	SeedTables	[]string	`json:"seed-tables"`
+	SeedTables []string `json:"seed-tables"`
 }
 
 func LoadConfig(config *Config, ctx *cli.Context) {
@@ -99,7 +99,7 @@ func (config *Config) applyArguments(ctx *cli.Context) {
 	if ctx.String("host") != "" {
 		config.Host = ctx.String("host")
 	}
-	if ctx.Int("port") != 0  {
+	if ctx.Int("port") != 0 {
 		config.Port = ctx.Int("port")
 	}
 	if ctx.String("url") != "" {
