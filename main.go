@@ -113,16 +113,33 @@ func main() {
 			fmt.Println("error reading config file: ", err)
 		}
 
-		// apply some defaults
+		// apply defaults from Postgres environment variables, but allow
+		// them to be overridden in the next step
+		if os.Getenv("PGUSER") != "" {
+			config.Username = os.Getenv("PGUSER")
+		}
+		if os.Getenv("PGPASSWORD") != "" {
+			config.Password = os.Getenv("PGPASSWORD")
+		}
+		if os.Getenv("PGDATABASE") != "" {
+			config.Database = os.Getenv("PGDATABASE")
+		}
+		if os.Getenv("PGHOST") != "" {
+			config.Host = os.Getenv("PGHOST")
+		}
+		if os.Getenv("PGPORT") != "" {
+			config.Port, _ = strconv.Atoi(os.Getenv("PGPORT"))
+		}
+
+		// apply some other, sane defaults
 		if config.Port == 0 {
 			config.Port = 5432
 		}
-
 		if config.Host == "" {
 			config.Host = "localhost"
 		}
 
-		// override if passed-in
+		// override if passed-in from the CLI or via environment variables
 		if c.String("username") != "" {
 			config.Username = c.String("username")
 		}
