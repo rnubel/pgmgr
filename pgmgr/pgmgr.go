@@ -16,23 +16,6 @@ import (
 	"time"
 )
 
-type Config struct {
-	// connection
-	Username string
-	Password string
-	Database string
-	Host     string
-	Port     int
-	Url      string
-
-	// filepaths
-	DumpFile        string	`json:"dump-file"`
-	MigrationFolder string	`json:"migration-folder"`
-
-	// options
-	SeedTables	[]string	`json:"seed-tables"`
-}
-
 type Migration struct {
 	Filename string
 	Version  int
@@ -64,8 +47,8 @@ func Dump(c *Config) error {
 	// then selected data...
 	args := []string{c.Database, "--data-only"}
 	if len(c.SeedTables) > 0 {
-		for _, table := range(c.SeedTables) {
-		  println("pulling data for", table)
+		for _, table := range c.SeedTables {
+			println("pulling data for", table)
 			args = append(args, "-t", table)
 		}
 	}
@@ -77,7 +60,7 @@ func Dump(c *Config) error {
 	}
 
 	// and combine into one file.
-	file, err := os.OpenFile(c.DumpFile, os.O_CREATE | os.O_TRUNC | os.O_RDWR, 0600)
+	file, err := os.OpenFile(c.DumpFile, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}
@@ -116,11 +99,11 @@ func Migrate(c *Config) error {
 			if err = applyMigration(c, m, UP); err != nil { // halt the migration process and return the error.
 				fmt.Println(err)
 				fmt.Println("")
-			  fmt.Println("ERROR! Aborting the migration process.")
+				fmt.Println("ERROR! Aborting the migration process.")
 				return err
 			}
 
-			fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds() / 1e6, "ms ==")
+			fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
 			appliedAny = true
 		}
 	}
@@ -160,7 +143,7 @@ func Rollback(c *Config) error {
 		return err
 	}
 
-	fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds() / 1e6, "ms ==")
+	fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
 
 	return nil
 }
@@ -205,11 +188,10 @@ func Initialize(c *Config) error {
 	return nil
 }
 
-
 // Creates new, blank migration files.
 func CreateMigration(c *Config, name string) error {
 	version := generateVersion()
-	up_filepath   := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
+	up_filepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
 	down_filepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".down.sql"))
 
 	err := ioutil.WriteFile(up_filepath, []byte(`-- Migration goes here.`), 0644)
