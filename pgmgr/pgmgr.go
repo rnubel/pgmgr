@@ -333,6 +333,7 @@ func sqlConnectionString(c *Config) string {
 		" dbname='", c.Database, "'",
 		" password='", c.Password, "'",
 		" host='", c.Host, "'",
+		" port=", c.Port,
 		" sslmode=", "disable")
 }
 
