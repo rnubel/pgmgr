@@ -172,7 +172,7 @@ func Version(c *Config) (int64, error) {
 	}
 
 	var version int64
-	err = db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version)
+	err = db.QueryRow("SELECT COALESCE(MAX(version)::text, '-1') FROM schema_migrations").Scan(&version)
 
 	return version, err
 }
@@ -264,12 +264,12 @@ func applyMigration(c *Config, m Migration, direction int) error {
 	}
 
 	if direction == UP {
-		if err = insertSchemaVersion(tx, m.Version); err != nil {
+		if err = insertSchemaVersion(c, tx, m.Version); err != nil {
 			tx.Rollback()
 			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
 	} else {
-		if err = deleteSchemaVersion(tx, m.Version); err != nil {
+		if err = deleteSchemaVersion(c, tx, m.Version); err != nil {
 			tx.Rollback()
 			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
@@ -283,14 +283,21 @@ func applyMigration(c *Config, m Migration, direction int) error {
 	return nil
 }
 
-func insertSchemaVersion(tx *sql.Tx, version int64) error {
-	_, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1) RETURNING version", version)
+func insertSchemaVersion(c *Config, tx *sql.Tx, version int64) error {
+	_, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1) RETURNING version", typedVersion(c, version))
 	return err
 }
 
-func deleteSchemaVersion(tx *sql.Tx, version int64) error {
-	_, err := tx.Exec("DELETE FROM schema_migrations WHERE version = $1", version)
+func deleteSchemaVersion(c *Config, tx *sql.Tx, version int64) error {
+	_, err := tx.Exec("DELETE FROM schema_migrations WHERE version = $1", typedVersion(c, version))
 	return err
+}
+
+func typedVersion(c *Config, version int64) interface{} {
+	if c.ColumnType == "string" {
+		return strconv.FormatInt(version, 10)
+	}
+	return version
 }
 
 func migrationIsApplied(c *Config, version int64) (bool, error) {
@@ -336,15 +343,16 @@ func sqlConnectionString(c *Config) string {
 }
 
 func migrations(c *Config, direction string) ([]Migration, error) {
-	files, err := ioutil.ReadDir(c.MigrationFolder)
+	re := regexp.MustCompile("^[0-9]+")
+
 	migrations := []Migration{}
+	files, err := ioutil.ReadDir(c.MigrationFolder)
 	if err != nil {
-		return []Migration{}, err
+		return migrations, err
 	}
 
 	for _, file := range files {
 		if match, _ := regexp.MatchString("[0-9]+_.+."+direction+".sql", file.Name()); match {
-			re := regexp.MustCompile("^[0-9]+")
 			version, _ := strconv.ParseInt(re.FindString(file.Name()), 10, 64)
 			migrations = append(migrations, Migration{Filename: file.Name(), Version: version})
 		}
