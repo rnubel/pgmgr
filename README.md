@@ -64,10 +64,20 @@ variable `PGMGR_CONFIG_FILE`. It should look something like:
   "database": "testdb",
   "migration-folder": "db/migrate",
   "dump-file": "db/dump.sql",
+  "column-type": "integer",
+  "format": "unix",
   "seed-tables": [ "foos", "bars" ]
 }
 ```
 
+The `column-type` option can be `integer` or `string`, and determines
+the type of the `schema_migrations.version` column. The `string` column
+type will store versions as `CHARACTER VARYING (255)`.
+
+The `format` option can be `unix` or `datetime`. The `unix` format is
+the integer epoch time; the `datetime` uses versions similar to ActiveRecord,
+such as `20150910120933`. In order to use the `datetime` format, you must
+also use the `string` column type.
 
 ### Environment variables
 
