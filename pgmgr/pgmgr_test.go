@@ -152,6 +152,25 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestColumnTypeString(t *testing.T) {
+	testSh(t, "dropdb", []string{"testdb"})
+	testSh(t, "createdb", []string{"testdb"})
+
+	config := globalConfig()
+	config.ColumnType = "string"
+	pgmgr.Initialize(config)
+
+	testSh(t, "psql", []string{"-e", "-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES ('20150910120933')"})
+	version, err := pgmgr.Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if version != 20150910120933 {
+		t.Fatal("expected version to be 20150910120933, got", version)
+	}
+}
+
 func TestMigrate(t *testing.T) {
 	// start with an empty DB
 	testSh(t, "dropdb", []string{"testdb"})

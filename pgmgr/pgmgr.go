@@ -20,7 +20,7 @@ import (
 // Migration stores a single migration's version and filename.
 type Migration struct {
 	Filename string
-	Version  int
+	Version  int64
 }
 
 // Migration directions
@@ -156,7 +156,7 @@ func Rollback(c *Config) error {
 // Version returns the highest version number stored in the database. This is not
 // necessarily enough info to uniquely identify the version, since there may
 // be backdated migrations which have not yet applied.
-func Version(c *Config) (int, error) {
+func Version(c *Config) (int64, error) {
 	db, err := openConnection(c)
 	defer db.Close()
 
@@ -171,7 +171,7 @@ func Version(c *Config) (int, error) {
 		return -1, err
 	}
 
-	var version int
+	var version int64
 	err = db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version)
 
 	return version, err
@@ -185,7 +185,14 @@ func Initialize(c *Config) error {
 		return err
 	}
 
-	_, err = db.Exec("CREATE TABLE schema_migrations (version INTEGER NOT NULL)")
+	var statement string
+	if c.ColumnType == "string" {
+		statement = "CREATE TABLE schema_migrations (version CHARACTER VARYING(255) NOT NULL)"
+	} else {
+		statement = "CREATE TABLE schema_migrations (version INTEGER NOT NULL)"
+	}
+
+	_, err = db.Exec(statement)
 	if err != nil {
 		return err
 	}
@@ -276,17 +283,17 @@ func applyMigration(c *Config, m Migration, direction int) error {
 	return nil
 }
 
-func insertSchemaVersion(tx *sql.Tx, version int) error {
+func insertSchemaVersion(tx *sql.Tx, version int64) error {
 	_, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1) RETURNING version", version)
 	return err
 }
 
-func deleteSchemaVersion(tx *sql.Tx, version int) error {
+func deleteSchemaVersion(tx *sql.Tx, version int64) error {
 	_, err := tx.Exec("DELETE FROM schema_migrations WHERE version = $1", version)
 	return err
 }
 
-func migrationIsApplied(c *Config, version int) (bool, error) {
+func migrationIsApplied(c *Config, version int64) (bool, error) {
 	db, err := openConnection(c)
 	defer db.Close()
 	if err != nil {
@@ -302,8 +309,8 @@ func migrationIsApplied(c *Config, version int) (bool, error) {
 	return applied, nil
 }
 
-func getOrInitializeVersion(c *Config) (int, error) {
-	var v int
+func getOrInitializeVersion(c *Config) (int64, error) {
+	var v int64
 	if v, _ = Version(c); v < 0 {
 		if err := Initialize(c); err != nil {
 			return -1, err
@@ -338,7 +345,7 @@ func migrations(c *Config, direction string) ([]Migration, error) {
 	for _, file := range files {
 		if match, _ := regexp.MatchString("[0-9]+_.+."+direction+".sql", file.Name()); match {
 			re := regexp.MustCompile("^[0-9]+")
-			version, _ := strconv.Atoi(re.FindString(file.Name()))
+			version, _ := strconv.ParseInt(re.FindString(file.Name()), 10, 64)
 			migrations = append(migrations, Migration{Filename: file.Name(), Version: version})
 		}
 	}
