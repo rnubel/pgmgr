@@ -36,6 +36,14 @@ func TestDefaults(t *testing.T) {
 	if c.Host != "localhost" {
 		t.Fatal("config's host should default to localhost, but was ", c.Host)
 	}
+
+	if c.ColumnType != "integer" {
+		t.Fatal("config's column type should default to integer, but was ", c.ColumnType)
+	}
+
+	if c.Format != "unix" {
+		t.Fatal("config's format should default to unix, but was ", c.Format)
+	}
 }
 
 func TestOverlays(t *testing.T) {

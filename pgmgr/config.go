@@ -33,6 +33,8 @@ type Config struct {
 
 	// options
 	SeedTables []string `json:"seed-tables"`
+	ColumnType string   `json:"column-type"`
+	Format     string   `json:"format"`
 }
 
 // LoadConfig reads the config file and applies CLI arguments as
@@ -93,6 +95,12 @@ func (config *Config) applyDefaults() {
 	}
 	if config.Host == "" {
 		config.Host = "localhost"
+	}
+	if config.Format == "" {
+		config.Format = "unix"
+	}
+	if config.ColumnType == "" {
+		config.ColumnType = "integer"
 	}
 }
 
