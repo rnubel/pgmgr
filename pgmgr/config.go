@@ -11,12 +11,13 @@ import (
 
 // Something that stores key-value pairs of various types,
 // e.g., cli.Context.
-type ArgumentContext interface {
+type argumentContext interface {
 	String(string) string
 	Int(string) int
 	StringSlice(string) []string
 }
 
+// Config stores the options used by pgmgr.
 type Config struct {
 	// connection
 	Username string
@@ -24,7 +25,7 @@ type Config struct {
 	Database string
 	Host     string
 	Port     int
-	Url      string
+	URL      string
 
 	// filepaths
 	DumpFile        string `json:"dump-file"`
@@ -34,7 +35,9 @@ type Config struct {
 	SeedTables []string `json:"seed-tables"`
 }
 
-func LoadConfig(config *Config, ctx ArgumentContext) {
+// LoadConfig reads the config file and applies CLI arguments as
+// overrides.
+func LoadConfig(config *Config, ctx argumentContext) {
 	// load configuration from file first; then override with
 	// flags or env vars if they're present.
 	configFile := ctx.String("config-file")
@@ -52,8 +55,8 @@ func LoadConfig(config *Config, ctx ArgumentContext) {
 
 	// if a connection URL was passed, use that instead for our connection
 	// configuration
-	if config.Url != "" {
-		config.overrideFromUrl()
+	if config.URL != "" {
+		config.overrideFromURL()
 	}
 }
 
@@ -93,7 +96,7 @@ func (config *Config) applyDefaults() {
 	}
 }
 
-func (config *Config) applyArguments(ctx ArgumentContext) {
+func (config *Config) applyArguments(ctx argumentContext) {
 	if ctx.String("username") != "" {
 		config.Username = ctx.String("username")
 	}
@@ -110,7 +113,7 @@ func (config *Config) applyArguments(ctx ArgumentContext) {
 		config.Port = ctx.Int("port")
 	}
 	if ctx.String("url") != "" {
-		config.Url = ctx.String("url")
+		config.URL = ctx.String("url")
 	}
 	if ctx.String("dump-file") != "" {
 		config.DumpFile = ctx.String("dump-file")
@@ -123,17 +126,17 @@ func (config *Config) applyArguments(ctx ArgumentContext) {
 	}
 }
 
-func (config *Config) overrideFromUrl() {
+func (config *Config) overrideFromURL() {
 	// parse the DSN and populate the other configuration values. Some of the pg commands
 	// accept a DSN parameter, but not all, so this will help unify things.
 	r := regexp.MustCompile("^postgres://(.*)@(.*):([0-9]+)/([a-zA-Z0-9_-]+)")
-	m := r.FindStringSubmatch(config.Url)
+	m := r.FindStringSubmatch(config.URL)
 	if len(m) > 0 {
 		config.Username = m[1]
 		config.Host = m[2]
 		config.Port, _ = strconv.Atoi(m[3])
 		config.Database = m[4]
 	} else {
-		println("Could not parse DSN:  ", config.Url, " using regex ", r.String())
+		println("Could not parse DSN:  ", config.URL, " using regex ", r.String())
 	}
 }

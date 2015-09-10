@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/codegangsta/cli"
 	"github.com/rnubel/pgmgr/pgmgr"
-	"os"
 )
 
 func displayErrorOrMessage(err error, args ...interface{}) {
@@ -33,7 +34,7 @@ func main() {
 	app.Usage = "manage your app's Postgres database"
 	app.Version = "0.0.1"
 
-	s := make([]string, 0)
+	var s []string
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
