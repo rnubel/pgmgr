@@ -29,6 +29,8 @@ const (
 	UP
 )
 
+const datetimeFormat = "20060102130405"
+
 // Create creates the database specified by the configuration.
 func Create(c *Config) error {
 	return sh("createdb", []string{c.Database})
@@ -193,7 +195,7 @@ func Initialize(c *Config) error {
 
 // CreateMigration generates new, empty migration files.
 func CreateMigration(c *Config, name string) error {
-	version := generateVersion()
+	version := generateVersion(c)
 	upFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
 	downFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".down.sql"))
 
@@ -212,10 +214,14 @@ func CreateMigration(c *Config, name string) error {
 	return nil
 }
 
-func generateVersion() int {
-	// TODO: guarantee no conflicts by incrementing if there is a conflict
-	v := int(time.Now().Unix())
-	return v
+func generateVersion(c *Config) string {
+	t := time.Now()
+
+	if c.Format == "datetime" {
+		return t.Format(datetimeFormat)
+	}
+
+	return strconv.FormatInt(t.Unix(), 10)
 }
 
 // need access to the original query contents in order to print it out properly,

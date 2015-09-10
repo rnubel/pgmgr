@@ -242,6 +242,24 @@ func TestCreateMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	expectedStringVersion := time.Now().Format(datetimeFormat)
+	config := globalConfig()
+	config.Format = "datetime"
+	err = pgmgr.CreateMigration(config, "rails_style")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedStringVersion, "_rails_style.up.sql")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedStringVersion, "_rails_style.down.sql")})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // redundant, but I'm also lazy
