@@ -87,7 +87,7 @@ func TestOverlays(t *testing.T) {
 
 func TestURL(t *testing.T) {
 	c := &pgmgr.Config{}
-	c.Url = "postgres://foo@bar:5431/testdb"
+	c.URL = "postgres://foo@bar:5431/testdb"
 
 	pgmgr.LoadConfig(c, &TestContext{})
 

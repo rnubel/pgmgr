@@ -17,27 +17,29 @@ import (
 	"github.com/lib/pq"
 )
 
+// Migration stores a single migration's version and filename.
 type Migration struct {
 	Filename string
 	Version  int
 }
 
+// Migration directions
 const (
 	DOWN = iota
-	UP   = iota
+	UP
 )
 
-// Creates the database specified by the configuration.
+// Create creates the database specified by the configuration.
 func Create(c *Config) error {
 	return sh("createdb", []string{c.Database})
 }
 
-// Drops the database specified by the configuration.
+// Drop drops the database specified by the configuration.
 func Drop(c *Config) error {
 	return sh("dropdb", []string{c.Database})
 }
 
-// Dumps the schema and contents of the database to the dump file.
+// Dump dumps the schema and contents of the database to the dump file.
 func Dump(c *Config) error {
 	// dump schema first...
 	schema, err := shRead("pg_dump", []string{"--schema-only", c.Database})
@@ -73,12 +75,12 @@ func Dump(c *Config) error {
 	return nil
 }
 
-// Loads the database from the dump file.
+// Load loads the database from the dump file using psql.
 func Load(c *Config) error {
 	return sh("psql", []string{"-d", c.Database, "-f", c.DumpFile})
 }
 
-// Applies un-applied migrations in the specified MigrationFolder.
+// Migrate applies un-applied migrations in the specified MigrationFolder.
 func Migrate(c *Config) error {
 	migrations, err := migrations(c, "up")
 	if err != nil {
@@ -116,7 +118,7 @@ func Migrate(c *Config) error {
 	return nil
 }
 
-// Un-applies the latest migration, if possible.
+// Rollback un-applies the latest migration, if possible.
 func Rollback(c *Config) error {
 	migrations, err := migrations(c, "down")
 	if err != nil {
@@ -124,23 +126,23 @@ func Rollback(c *Config) error {
 	}
 
 	v, _ := Version(c)
-	var to_rollback *Migration
+	var toRollback *Migration
 	for _, m := range migrations {
 		if m.Version == v {
-			to_rollback = &m
+			toRollback = &m
 			break
 		}
 	}
 
-	if to_rollback == nil {
+	if toRollback == nil {
 		return nil
 	}
 
 	// rollback only the last migration
-	fmt.Println("== Reverting", to_rollback.Filename, "==")
+	fmt.Println("== Reverting", toRollback.Filename, "==")
 	t0 := time.Now()
 
-	if err = applyMigration(c, *to_rollback, DOWN); err != nil {
+	if err = applyMigration(c, *toRollback, DOWN); err != nil {
 		return err
 	}
 
@@ -149,7 +151,7 @@ func Rollback(c *Config) error {
 	return nil
 }
 
-// Returns the highest version number stored in the database. This is not
+// Version returns the highest version number stored in the database. This is not
 // necessarily enough info to uniquely identify the version, since there may
 // be backdated migrations which have not yet applied.
 func Version(c *Config) (int, error) {
@@ -173,7 +175,7 @@ func Version(c *Config) (int, error) {
 	return version, err
 }
 
-// Creates the schema_migrations table on what should be a new database.
+// Initialize creates the schema_migrations table on what should be a new database.
 func Initialize(c *Config) error {
 	db, err := openConnection(c)
 	defer db.Close()
@@ -189,23 +191,23 @@ func Initialize(c *Config) error {
 	return nil
 }
 
-// Creates new, blank migration files.
+// CreateMigration generates new, empty migration files.
 func CreateMigration(c *Config, name string) error {
 	version := generateVersion()
-	up_filepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
-	down_filepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".down.sql"))
+	upFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
+	downFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".down.sql"))
 
-	err := ioutil.WriteFile(up_filepath, []byte(`-- Migration goes here.`), 0644)
+	err := ioutil.WriteFile(upFilepath, []byte(`-- Migration goes here.`), 0644)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Created", up_filepath)
+	fmt.Println("Created", upFilepath)
 
-	err = ioutil.WriteFile(down_filepath, []byte(`-- Rollback of migration goes here. If you don't want to write it, delete this file.`), 0644)
+	err = ioutil.WriteFile(downFilepath, []byte(`-- Rollback of migration goes here. If you don't want to write it, delete this file.`), 0644)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Created", down_filepath)
+	fmt.Println("Created", downFilepath)
 
 	return nil
 }
@@ -285,13 +287,13 @@ func migrationIsApplied(c *Config, version int) (bool, error) {
 		return false, err
 	}
 
-	var is_applied bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1);", version).Scan(&is_applied)
+	var applied bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1);", version).Scan(&applied)
 	if err != nil {
 		return false, err
 	}
 
-	return is_applied, nil
+	return applied, nil
 }
 
 func getOrInitializeVersion(c *Config) (int, error) {
