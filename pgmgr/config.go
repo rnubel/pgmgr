@@ -35,7 +35,7 @@ type Config struct {
 	// options
 	SeedTables []string `json:"seed-tables"`
 	ColumnType string   `json:"column-type"`
-	Format     string   `json:"format"`
+	Format     string
 }
 
 // LoadConfig reads the config file, applies CLI arguments as
