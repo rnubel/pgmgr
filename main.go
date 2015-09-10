@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/codegangsta/cli"
 	"github.com/rnubel/pgmgr/pgmgr"
-	"os"
 )
 
 func displayErrorOrMessage(err error, args ...interface{}) {

@@ -1,13 +1,14 @@
 package pgmgr
 
 import (
-	"../pgmgr"
 	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"../pgmgr"
 )
 
 func globalConfig() *pgmgr.Config {

@@ -1,17 +1,19 @@
 package pgmgr
 
 import (
-	"testing"
-	"../pgmgr"
 	"os"
+	"testing"
+
+	"../pgmgr"
 )
 
 // create a mock to replace cli.Context
 type TestContext struct {
-	StringVals map[string] string
-	IntVals map[string] int
-	StringSliceVals map[string] []string
+	StringVals      map[string]string
+	IntVals         map[string]int
+	StringSliceVals map[string][]string
 }
+
 func (t *TestContext) String(key string) string {
 	return t.StringVals[key]
 }
@@ -46,7 +48,7 @@ func TestOverlays(t *testing.T) {
 	ctx.IntVals["port"] = 456
 	os.Setenv("PGPORT", "789")
 
-  pgmgr.LoadConfig(c, ctx)
+	pgmgr.LoadConfig(c, ctx)
 
 	if c.Port != 456 {
 		t.Fatal("config's port should come from the context, but was", c.Port)
@@ -61,7 +63,7 @@ func TestOverlays(t *testing.T) {
 	c.Port = 123
 	os.Setenv("PGPORT", "789")
 
-  pgmgr.LoadConfig(c, ctx)
+	pgmgr.LoadConfig(c, ctx)
 
 	if c.Port != 789 {
 		t.Fatal("config's port should come from PGPORT, but was", c.Port)
@@ -76,14 +78,14 @@ func TestOverlays(t *testing.T) {
 	c.Port = 123
 	os.Setenv("PGPORT", "")
 
-  pgmgr.LoadConfig(c, ctx)
+	pgmgr.LoadConfig(c, ctx)
 
 	if c.Port != 123 {
 		t.Fatal("config's port should not change, but was", c.Port)
 	}
 }
 
-func TestURL (t *testing.T) {
+func TestURL(t *testing.T) {
 	c := &pgmgr.Config{}
 	c.Url = "postgres://foo@bar:5431/testdb"
 
