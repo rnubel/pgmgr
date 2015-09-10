@@ -36,6 +36,14 @@ func TestDefaults(t *testing.T) {
 	if c.Host != "localhost" {
 		t.Fatal("config's host should default to localhost, but was ", c.Host)
 	}
+
+	if c.ColumnType != "integer" {
+		t.Fatal("config's column type should default to integer, but was ", c.ColumnType)
+	}
+
+	if c.Format != "unix" {
+		t.Fatal("config's format should default to unix, but was ", c.Format)
+	}
 }
 
 func TestOverlays(t *testing.T) {
@@ -93,5 +101,26 @@ func TestURL(t *testing.T) {
 
 	if c.Username != "foo" || c.Host != "bar" || c.Port != 5431 || c.Database != "testdb" {
 		t.Fatal("config did not populate itself from the given URL:", c)
+	}
+}
+
+func TestValidation(t *testing.T) {
+	c := &pgmgr.Config{}
+	c.Format = "wrong"
+
+	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+		t.Fatal("LoadConfig should reject invalid Format value")
+	}
+
+	c.Format = ""
+	c.ColumnType = "wrong"
+	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+		t.Fatal("LoadConfig should reject invalid ColumnType value")
+	}
+
+	c.Format = "datetime"
+	c.ColumnType = "integer"
+	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+		t.Fatal("LoadConfig should prevent Format=datetime when ColumnType=integer")
 	}
 }

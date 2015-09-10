@@ -152,6 +152,25 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestColumnTypeString(t *testing.T) {
+	testSh(t, "dropdb", []string{"testdb"})
+	testSh(t, "createdb", []string{"testdb"})
+
+	config := globalConfig()
+	config.ColumnType = "string"
+	pgmgr.Initialize(config)
+
+	testSh(t, "psql", []string{"-e", "-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES ('20150910120933')"})
+	version, err := pgmgr.Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if version != 20150910120933 {
+		t.Fatal("expected version to be 20150910120933, got", version)
+	}
+}
+
 func TestMigrate(t *testing.T) {
 	// start with an empty DB
 	testSh(t, "dropdb", []string{"testdb"})
@@ -223,6 +242,56 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
+func TestMigrateColumnTypeString(t *testing.T) {
+	// start with an empty DB
+	testSh(t, "dropdb", []string{"testdb"})
+	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
+	testSh(t, "mkdir", []string{"/tmp/migrations"})
+
+	config := globalConfig()
+	config.ColumnType = "string"
+
+	// migrate up
+	ioutil.WriteFile("/tmp/migrations/20150910120933_some_migration.up.sql", []byte(`
+		CREATE TABLE foos (foo_id INTEGER);
+		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
+	`), 0644)
+
+	err := pgmgr.Migrate(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := pgmgr.Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != 20150910120933 {
+		t.Fatal("Expected version 20150910120933 after migration, got", v)
+	}
+
+	// migrate down
+	ioutil.WriteFile("/tmp/migrations/20150910120933_some_migration.down.sql", []byte(`
+        DROP TABLE foos;
+	`), 0644)
+
+	err = pgmgr.Rollback(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v, err = pgmgr.Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != -1 {
+		t.Fatal("Expected version -1 after rollback, got", v)
+	}
+}
+
 func TestCreateMigration(t *testing.T) {
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
@@ -239,6 +308,24 @@ func TestCreateMigration(t *testing.T) {
 	}
 
 	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedVersion, "_new_migration.down.sql")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedStringVersion := time.Now().Format(datetimeFormat)
+	config := globalConfig()
+	config.Format = "datetime"
+	err = pgmgr.CreateMigration(config, "rails_style")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedStringVersion, "_rails_style.up.sql")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedStringVersion, "_rails_style.down.sql")})
 	if err != nil {
 		t.Fatal(err)
 	}

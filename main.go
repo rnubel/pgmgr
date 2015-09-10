@@ -100,11 +100,7 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
-		// TODO: LoadConfig should validate some basic properties of a valid config,
-		// like that the database name is set, and return an error if not.
-		pgmgr.LoadConfig(config, c)
-
-		return nil
+		return pgmgr.LoadConfig(config, c)
 	}
 
 	app.Commands = []cli.Command{
