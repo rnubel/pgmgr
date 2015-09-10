@@ -222,6 +222,7 @@ func CreateMigration(c *Config, name string) error {
 }
 
 func generateVersion(c *Config) string {
+	// TODO: guarantee no conflicts by incrementing if there is a conflict
 	t := time.Now()
 
 	if c.Format == "datetime" {
