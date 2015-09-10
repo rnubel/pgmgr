@@ -103,3 +103,24 @@ func TestURL(t *testing.T) {
 		t.Fatal("config did not populate itself from the given URL:", c)
 	}
 }
+
+func TestValidation(t *testing.T) {
+	c := &pgmgr.Config{}
+	c.Format = "wrong"
+
+	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+		t.Fatal("LoadConfig should reject invalid Format value")
+	}
+
+	c.Format = ""
+	c.ColumnType = "wrong"
+	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+		t.Fatal("LoadConfig should reject invalid ColumnType value")
+	}
+
+	c.Format = "datetime"
+	c.ColumnType = "integer"
+	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+		t.Fatal("LoadConfig should prevent Format=datetime when ColumnType=integer")
+	}
+}

@@ -2,6 +2,7 @@ package pgmgr
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -37,9 +38,9 @@ type Config struct {
 	Format     string   `json:"format"`
 }
 
-// LoadConfig reads the config file and applies CLI arguments as
-// overrides.
-func LoadConfig(config *Config, ctx argumentContext) {
+// LoadConfig reads the config file, applies CLI arguments as
+// overrides, and returns an error if the configuration is invalid.
+func LoadConfig(config *Config, ctx argumentContext) error {
 	// load configuration from file first; then override with
 	// flags or env vars if they're present.
 	configFile := ctx.String("config-file")
@@ -60,6 +61,8 @@ func LoadConfig(config *Config, ctx argumentContext) {
 	if config.URL != "" {
 		config.overrideFromURL()
 	}
+
+	return config.validate()
 }
 
 func (config *Config) populateFromFile(configFile string) {
@@ -147,4 +150,20 @@ func (config *Config) overrideFromURL() {
 	} else {
 		println("Could not parse DSN:  ", config.URL, " using regex ", r.String())
 	}
+}
+
+func (config *Config) validate() error {
+	if config.ColumnType != "integer" && config.ColumnType != "string" {
+		return errors.New(`ColumnType must be "integer" or "string"`)
+	}
+
+	if config.Format != "unix" && config.Format != "datetime" {
+		return errors.New(`Format must be "unix" or "datetime"`)
+	}
+
+	if config.Format == "datetime" && config.ColumnType != "string" {
+		return errors.New(`ColumnType must be "string" if Format is "datetime"`)
+	}
+
+	return nil
 }
