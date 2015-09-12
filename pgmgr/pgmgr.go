@@ -187,9 +187,9 @@ func Initialize(c *Config) error {
 
 	var statement string
 	if c.ColumnType == "string" {
-		statement = "CREATE TABLE schema_migrations (version CHARACTER VARYING(255) NOT NULL)"
+		statement = "CREATE TABLE schema_migrations (version CHARACTER VARYING(255) NOT NULL UNIQUE)"
 	} else {
-		statement = "CREATE TABLE schema_migrations (version INTEGER NOT NULL)"
+		statement = "CREATE TABLE schema_migrations (version INTEGER NOT NULL UNIQUE)"
 	}
 
 	_, err = db.Exec(statement)
