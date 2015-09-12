@@ -17,12 +17,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// Migration stores a single migration's version and filename.
-type Migration struct {
-	Filename string
-	Version  int64
-}
-
 // Migration directions
 const (
 	DOWN = iota
@@ -30,6 +24,18 @@ const (
 )
 
 const datetimeFormat = "20060102130405"
+
+// Migration stores a single migration's version and filename.
+type Migration struct {
+	Filename string
+	Version  int64
+}
+
+// WrapInTransaction returns whether the migration should be run within
+// a transaction.
+func (m Migration) WrapInTransaction() bool {
+	return !strings.Contains(m.Filename, ".no_txn.")
+}
 
 // Create creates the database specified by the configuration.
 func Create(c *Config) error {
@@ -201,10 +207,16 @@ func Initialize(c *Config) error {
 }
 
 // CreateMigration generates new, empty migration files.
-func CreateMigration(c *Config, name string) error {
+func CreateMigration(c *Config, name string, noTransaction bool) error {
 	version := generateVersion(c)
-	upFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
-	downFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".down.sql"))
+	prefix := fmt.Sprint(version, "_", name)
+
+	if noTransaction {
+		prefix += ".no_txn"
+	}
+
+	upFilepath := filepath.Join(c.MigrationFolder, prefix+".up.sql")
+	downFilepath := filepath.Join(c.MigrationFolder, prefix+".down.sql")
 
 	err := ioutil.WriteFile(upFilepath, []byte(`-- Migration goes here.`), 0644)
 	if err != nil {
@@ -242,16 +254,18 @@ func formatPgErr(contents *[]byte, pgerr *pq.Error) string {
 	return fmt.Sprint("PGERROR: line ", lineNo, " pos ", columnNo, ": ", pgerr.Message, ". ", pgerr.Detail)
 }
 
-func applyMigration(c *Config, m Migration, direction int) error {
-	db, err := openConnection(c)
-	defer db.Close()
-	if err != nil {
-		return err
-	}
+type execer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
 
-	tx, err := db.Begin()
-	if err != nil {
-		return err
+func applyMigration(c *Config, m Migration, direction int) error {
+	var tx *sql.Tx
+	var exec execer
+
+	rollback := func() {
+		if tx != nil {
+			tx.Rollback()
+		}
 	}
 
 	contents, err := ioutil.ReadFile(filepath.Join(c.MigrationFolder, m.Filename))
@@ -259,37 +273,54 @@ func applyMigration(c *Config, m Migration, direction int) error {
 		return err
 	}
 
-	if _, err = tx.Exec(string(contents)); err != nil {
-		tx.Rollback()
+	db, err := openConnection(c)
+	defer db.Close()
+	if err != nil {
+		return err
+	}
+	exec = db
+
+	if m.WrapInTransaction() {
+		tx, err = db.Begin()
+		if err != nil {
+			return err
+		}
+		exec = tx
+	}
+
+	if _, err = exec.Exec(string(contents)); err != nil {
+		rollback()
 		return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 	}
 
 	if direction == UP {
-		if err = insertSchemaVersion(c, tx, m.Version); err != nil {
-			tx.Rollback()
+		if err = insertSchemaVersion(c, exec, m.Version); err != nil {
+			rollback()
 			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
 	} else {
-		if err = deleteSchemaVersion(c, tx, m.Version); err != nil {
-			tx.Rollback()
+		if err = deleteSchemaVersion(c, exec, m.Version); err != nil {
+			rollback()
 			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return err
+	if tx != nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func insertSchemaVersion(c *Config, tx *sql.Tx, version int64) error {
+func insertSchemaVersion(c *Config, tx execer, version int64) error {
 	_, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1) RETURNING version", typedVersion(c, version))
 	return err
 }
 
-func deleteSchemaVersion(c *Config, tx *sql.Tx, version int64) error {
+func deleteSchemaVersion(c *Config, tx execer, version int64) error {
 	_, err := tx.Exec("DELETE FROM schema_migrations WHERE version = $1", typedVersion(c, version))
 	return err
 }
@@ -353,7 +384,7 @@ func migrations(c *Config, direction string) ([]Migration, error) {
 	}
 
 	for _, file := range files {
-		if match, _ := regexp.MatchString("[0-9]+_.+."+direction+".sql", file.Name()); match {
+		if match, _ := regexp.MatchString("[0-9]+_.+\\."+direction+"\\.sql", file.Name()); match {
 			version, _ := strconv.ParseInt(re.FindString(file.Name()), 10, 64)
 			migrations = append(migrations, Migration{Filename: file.Name(), Version: version})
 		}
