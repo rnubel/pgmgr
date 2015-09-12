@@ -293,6 +293,29 @@ func TestMigrateColumnTypeString(t *testing.T) {
 	}
 }
 
+func TestMigrateNoTransaction(t *testing.T) {
+	// start with an empty DB
+	testSh(t, "dropdb", []string{"testdb"})
+	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
+	testSh(t, "mkdir", []string{"/tmp/migrations"})
+
+	// CREATE INDEX CONCURRENTLY can not run inside a transaction, so we can assert
+	// that no transaction was used by verifying it ran successfully.
+	ioutil.WriteFile("/tmp/migrations/001_create_foos.up.sql", []byte(`
+		CREATE TABLE foos (foo_id INTEGER);
+	`), 0644)
+
+	ioutil.WriteFile("/tmp/migrations/002_index_foos.no_txn.up.sql", []byte(`
+		CREATE INDEX CONCURRENTLY idx_foo_id ON foos(foo_id);
+	`), 0644)
+
+	err := pgmgr.Migrate(globalConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCreateMigration(t *testing.T) {
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
