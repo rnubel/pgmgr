@@ -107,11 +107,17 @@ func main() {
 		{
 			Name:  "migration",
 			Usage: "generates a new migration with the given name",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "no-txn",
+					Usage: "generate a migration that will not be wrapped in a transaction when run",
+				},
+			},
 			Action: func(c *cli.Context) {
 				if len(c.Args()) == 0 {
 					println("migration name not given! try `pgmgr migration NameGoesHere`")
 				} else {
-					pgmgr.CreateMigration(config, c.Args()[0])
+					pgmgr.CreateMigration(config, c.Args()[0], c.Bool("no-txn"))
 				}
 			},
 		},

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -296,39 +297,40 @@ func TestCreateMigration(t *testing.T) {
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
+	assertFileExists := func(filename string) {
+		err := testSh(t, "stat", []string{filepath.Join("/tmp/migrations", filename)})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	expectedVersion := time.Now().Unix()
-	err := pgmgr.CreateMigration(globalConfig(), "new_migration")
+	err := pgmgr.CreateMigration(globalConfig(), "new_migration", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedVersion, "_new_migration.up.sql")})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedVersion, "_new_migration.down.sql")})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertFileExists(fmt.Sprint(expectedVersion, "_new_migration.up.sql"))
+	assertFileExists(fmt.Sprint(expectedVersion, "_new_migration.down.sql"))
 
 	expectedStringVersion := time.Now().Format(datetimeFormat)
 	config := globalConfig()
 	config.Format = "datetime"
-	err = pgmgr.CreateMigration(config, "rails_style")
+	err = pgmgr.CreateMigration(config, "rails_style", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedStringVersion, "_rails_style.up.sql")})
+	assertFileExists(fmt.Sprint(expectedStringVersion, "_rails_style.up.sql"))
+	assertFileExists(fmt.Sprint(expectedStringVersion, "_rails_style.down.sql"))
+
+	err = pgmgr.CreateMigration(config, "create_index", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = testSh(t, "stat", []string{fmt.Sprint("/tmp/migrations/", expectedStringVersion, "_rails_style.down.sql")})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertFileExists(fmt.Sprint(expectedStringVersion, "_create_index.no_txn.up.sql"))
+	assertFileExists(fmt.Sprint(expectedStringVersion, "_create_index.no_txn.down.sql"))
 }
 
 // redundant, but I'm also lazy

@@ -201,10 +201,16 @@ func Initialize(c *Config) error {
 }
 
 // CreateMigration generates new, empty migration files.
-func CreateMigration(c *Config, name string) error {
+func CreateMigration(c *Config, name string, noTransaction bool) error {
 	version := generateVersion(c)
-	upFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".up.sql"))
-	downFilepath := filepath.Join(c.MigrationFolder, fmt.Sprint(version, "_", name, ".down.sql"))
+	prefix := fmt.Sprint(version, "_", name)
+
+	if noTransaction {
+		prefix += ".no_txn"
+	}
+
+	upFilepath := filepath.Join(c.MigrationFolder, prefix+".up.sql")
+	downFilepath := filepath.Join(c.MigrationFolder, prefix+".down.sql")
 
 	err := ioutil.WriteFile(upFilepath, []byte(`-- Migration goes here.`), 0644)
 	if err != nil {
@@ -353,7 +359,7 @@ func migrations(c *Config, direction string) ([]Migration, error) {
 	}
 
 	for _, file := range files {
-		if match, _ := regexp.MatchString("[0-9]+_.+."+direction+".sql", file.Name()); match {
+		if match, _ := regexp.MatchString("[0-9]+_.+\\."+direction+"\\.sql", file.Name()); match {
 			version, _ := strconv.ParseInt(re.FindString(file.Name()), 10, 64)
 			migrations = append(migrations, Migration{Filename: file.Name(), Version: version})
 		}
