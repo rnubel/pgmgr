@@ -159,7 +159,7 @@ func TestInitialize(t *testing.T) {
 
 	psqlMustExec(t, `SELECT * FROM pgmgr.applied_migrations`)
 
-	// If we specify a schema-qualified, and the schema already existed,
+	// If we specify a schema-qualified table, and the schema already existed,
 	// that's fine too.
 	resetDB(t)
 	psqlMustExec(t, `CREATE SCHEMA pgmgr;`)
