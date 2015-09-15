@@ -62,10 +62,10 @@ func TestDrop(t *testing.T) {
 
 func TestDump(t *testing.T) {
 	resetDB(t)
-	testSh(t, "psql", []string{"-d", testDBName, "-c", "CREATE TABLE bars (bar_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", testDBName, "-c", "INSERT INTO bars (bar_id) VALUES (123), (456);"})
-	testSh(t, "psql", []string{"-d", testDBName, "-c", "CREATE TABLE foos (foo_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", testDBName, "-c", "INSERT INTO foos (foo_id) VALUES (789);"})
+	psqlMustExec(t, `CREATE TABLE bars (bar_id INTEGER);`)
+	psqlMustExec(t, `INSERT INTO bars (bar_id) VALUES (123), (456);`)
+	psqlMustExec(t, `CREATE TABLE foos (foo_id INTEGER);`)
+	psqlMustExec(t, `INSERT INTO foos (foo_id) VALUES (789);`)
 
 	c := globalConfig()
 	err := pgmgr.Dump(c)
@@ -127,11 +127,7 @@ func TestLoad(t *testing.T) {
 		t.Fatal("Could not load database from file")
 	}
 
-	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM foos;"})
-	if err != nil {
-		t.Log(err)
-		t.Fatal("Could not query the table; schema didn't load, probably")
-	}
+	psqlMustExec(t, `SELECT * FROM foos;`)
 }
 
 func TestVersion(t *testing.T) {
@@ -149,11 +145,9 @@ func TestVersion(t *testing.T) {
 	}
 
 	pgmgr.Initialize(globalConfig())
-
-	testSh(t, "psql", []string{"-e", "-d", testDBName, "-c", "INSERT INTO schema_migrations (version) VALUES (1)"})
+	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES (1);`)
 
 	version, err = pgmgr.Version(globalConfig())
-
 	if version != 1 {
 		t.Fatal("expected version to be 1, got", version)
 	}
@@ -166,7 +160,7 @@ func TestColumnTypeString(t *testing.T) {
 	config.ColumnType = "string"
 	pgmgr.Initialize(config)
 
-	testSh(t, "psql", []string{"-e", "-d", testDBName, "-c", "INSERT INTO schema_migrations (version) VALUES ('20150910120933')"})
+	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES ('20150910120933');`)
 	version, err := pgmgr.Version(config)
 	if err != nil {
 		t.Fatal(err)
@@ -204,11 +198,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Running migrations again was not idempotent!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM foos;"})
-	if err != nil {
-		t.Log(err)
-		t.Fatal("Could not query the table; migration didn't apply, probably")
-	}
+	psqlMustExec(t, `SELECT * FROM foos;`)
 
 	// add a new migration with an older version, as if another dev's branch was merged in
 	writeMigration(t, "001_this_is_an_older_migration.up.sql", `
@@ -222,19 +212,13 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Could not apply second migration!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM bars;"})
-	if err != nil {
-		t.Log(err)
-		t.Fatal("Could not query the table; second migration didn't apply, probably")
-	}
+	psqlMustExec(t, `SELECT * FROM bars;`)
 
 	// rollback the initial migration, since it has the latest version
 	err = pgmgr.Rollback(globalConfig())
 
-	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM foos;"})
-	if err == nil {
-		t.Log(err)
-		t.Fatal("Could query the table; migration didn't downgrade")
+	if err := psqlExec(t, `SELECT * FROM foos;`); err == nil {
+		t.Fatal("Should not have been able to select from foos table")
 	}
 
 	v, err := pgmgr.Version(globalConfig())
@@ -355,6 +339,17 @@ func testSh(t *testing.T, command string, args []string) error {
 	}
 
 	return nil
+}
+
+func psqlExec(t *testing.T, statement string) error {
+	return testSh(t, "psql", []string{"-d", testDBName, "-c", statement})
+}
+
+func psqlMustExec(t *testing.T, statement string) {
+	err := psqlExec(t, statement)
+	if err != nil {
+		t.Fatalf("Failed to execute statement: '%s': %s", statement, err)
+	}
 }
 
 func resetDB(t *testing.T) {
