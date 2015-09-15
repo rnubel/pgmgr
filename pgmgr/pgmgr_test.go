@@ -12,18 +12,23 @@ import (
 	"../pgmgr"
 )
 
+const (
+	testDBName = "pgmgr_testdb"
+	dumpFile   = "/tmp/pgmgr_dump.sql"
+)
+
 func globalConfig() *pgmgr.Config {
 	return &pgmgr.Config{
-		Database:        "testdb",
+		Database:        testDBName,
 		Host:            "localhost",
 		Port:            5432,
-		DumpFile:        "/tmp/dump.sql",
+		DumpFile:        dumpFile,
 		MigrationFolder: "/tmp/migrations/",
 	}
 }
 
 func TestCreate(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
+	testSh(t, "dropdb", []string{testDBName})
 	err := pgmgr.Create(globalConfig())
 
 	if err != nil {
@@ -32,13 +37,13 @@ func TestCreate(t *testing.T) {
 	}
 
 	// if we can't remove that db, it couldn't have been created by us above.
-	if err = testSh(t, "dropdb", []string{"testdb"}); err != nil {
+	if err = testSh(t, "dropdb", []string{testDBName}); err != nil {
 		t.Fatal("database doesn't seem to have been created!")
 	}
 }
 
 func TestDrop(t *testing.T) {
-	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "createdb", []string{testDBName})
 	err := pgmgr.Drop(globalConfig())
 
 	if err != nil {
@@ -46,18 +51,18 @@ func TestDrop(t *testing.T) {
 		t.Fatal("Could not drop database")
 	}
 
-	if err = testSh(t, "createdb", []string{"testdb"}); err != nil {
+	if err = testSh(t, "createdb", []string{testDBName}); err != nil {
 		t.Fatal("database doesn't seem to have been dropped!")
 	}
 }
 
 func TestDump(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "CREATE TABLE bars (bar_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO bars (bar_id) VALUES (123), (456);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "CREATE TABLE foos (foo_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO foos (foo_id) VALUES (789);"})
+	testSh(t, "dropdb", []string{testDBName})
+	testSh(t, "createdb", []string{testDBName})
+	testSh(t, "psql", []string{"-d", testDBName, "-c", "CREATE TABLE bars (bar_id INTEGER);"})
+	testSh(t, "psql", []string{"-d", testDBName, "-c", "INSERT INTO bars (bar_id) VALUES (123), (456);"})
+	testSh(t, "psql", []string{"-d", testDBName, "-c", "CREATE TABLE foos (foo_id INTEGER);"})
+	testSh(t, "psql", []string{"-d", testDBName, "-c", "INSERT INTO foos (foo_id) VALUES (789);"})
 
 	c := globalConfig()
 	err := pgmgr.Dump(c)
@@ -67,7 +72,7 @@ func TestDump(t *testing.T) {
 		t.Fatal("Could not dump database to file")
 	}
 
-	file, err := ioutil.ReadFile("/tmp/dump.sql")
+	file, err := ioutil.ReadFile(dumpFile)
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not read dump")
@@ -89,7 +94,7 @@ func TestDump(t *testing.T) {
 		t.Fatal("Could not dump database to file")
 	}
 
-	file, err = ioutil.ReadFile("/tmp/dump.sql")
+	file, err = ioutil.ReadFile(dumpFile)
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not read dump")
@@ -105,10 +110,10 @@ func TestDump(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "dropdb", []string{testDBName})
+	testSh(t, "createdb", []string{testDBName})
 
-	ioutil.WriteFile("/tmp/dump.sql", []byte(`
+	ioutil.WriteFile(dumpFile, []byte(`
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
 	`), 0644)
@@ -120,7 +125,7 @@ func TestLoad(t *testing.T) {
 		t.Fatal("Could not load database from file")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
+	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM foos;"})
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; schema didn't load, probably")
@@ -128,8 +133,8 @@ func TestLoad(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "dropdb", []string{testDBName})
+	testSh(t, "createdb", []string{testDBName})
 
 	version, err := pgmgr.Version(globalConfig())
 
@@ -144,7 +149,7 @@ func TestVersion(t *testing.T) {
 
 	pgmgr.Initialize(globalConfig())
 
-	testSh(t, "psql", []string{"-e", "-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES (1)"})
+	testSh(t, "psql", []string{"-e", "-d", testDBName, "-c", "INSERT INTO schema_migrations (version) VALUES (1)"})
 
 	version, err = pgmgr.Version(globalConfig())
 
@@ -154,14 +159,14 @@ func TestVersion(t *testing.T) {
 }
 
 func TestColumnTypeString(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "dropdb", []string{testDBName})
+	testSh(t, "createdb", []string{testDBName})
 
 	config := globalConfig()
 	config.ColumnType = "string"
 	pgmgr.Initialize(config)
 
-	testSh(t, "psql", []string{"-e", "-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES ('20150910120933')"})
+	testSh(t, "psql", []string{"-e", "-d", testDBName, "-c", "INSERT INTO schema_migrations (version) VALUES ('20150910120933')"})
 	version, err := pgmgr.Version(config)
 	if err != nil {
 		t.Fatal(err)
@@ -174,8 +179,8 @@ func TestColumnTypeString(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	// start with an empty DB
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "dropdb", []string{testDBName})
+	testSh(t, "createdb", []string{testDBName})
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
@@ -203,7 +208,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Running migrations again was not idempotent!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
+	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM foos;"})
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; migration didn't apply, probably")
@@ -221,7 +226,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatal("Could not apply second migration!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM bars;"})
+	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM bars;"})
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not query the table; second migration didn't apply, probably")
@@ -230,7 +235,7 @@ func TestMigrate(t *testing.T) {
 	// rollback the initial migration, since it has the latest version
 	err = pgmgr.Rollback(globalConfig())
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
+	err = testSh(t, "psql", []string{"-d", testDBName, "-c", "SELECT * FROM foos;"})
 	if err == nil {
 		t.Log(err)
 		t.Fatal("Could query the table; migration didn't downgrade")
@@ -245,8 +250,8 @@ func TestMigrate(t *testing.T) {
 
 func TestMigrateColumnTypeString(t *testing.T) {
 	// start with an empty DB
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "dropdb", []string{testDBName})
+	testSh(t, "createdb", []string{testDBName})
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
@@ -295,8 +300,8 @@ func TestMigrateColumnTypeString(t *testing.T) {
 
 func TestMigrateNoTransaction(t *testing.T) {
 	// start with an empty DB
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	testSh(t, "dropdb", []string{testDBName})
+	testSh(t, "createdb", []string{testDBName})
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
