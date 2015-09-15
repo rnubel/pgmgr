@@ -35,6 +35,10 @@ func TestDefaults(t *testing.T) {
 		t.Fatal("config's host should default to localhost, but was ", c.Host)
 	}
 
+	if c.MigrationTable != "schema_migrations" {
+		t.Fatal("config's migration table should default to schema_migrations, but was ", c.MigrationTable)
+	}
+
 	if c.ColumnType != "integer" {
 		t.Fatal("config's column type should default to integer, but was ", c.ColumnType)
 	}

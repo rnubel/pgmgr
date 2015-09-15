@@ -62,6 +62,7 @@ variable `PGMGR_CONFIG_FILE`. It should look something like:
   "username": "test",
   "password": "test",
   "database": "testdb",
+  "migration-table": "public.schema_migrations",
   "migration-folder": "db/migrate",
   "dump-file": "db/dump.sql",
   "column-type": "integer",
@@ -78,6 +79,13 @@ The `format` option can be `unix` or `datetime`. The `unix` format is
 the integer epoch time; the `datetime` uses versions similar to ActiveRecord,
 such as `20150910120933`. In order to use the `datetime` format, you must
 also use the `string` column type.
+
+The `migration-table` option can be used to specify an alternate table name
+in which to track migration status. It defaults to the schema un-qualified
+`schema_migrations`, which will typically create a table in the `public`
+schema unless the database's default search path has been modified. If you
+use a schema qualified name, pgmgr will attempt to create the schema first
+if it does not yet exist.
 
 ### Environment variables
 

@@ -33,9 +33,10 @@ type Config struct {
 	MigrationFolder string `json:"migration-folder"`
 
 	// options
-	SeedTables []string `json:"seed-tables"`
-	ColumnType string   `json:"column-type"`
-	Format     string
+	MigrationTable string   `json:"migration-table"`
+	SeedTables     []string `json:"seed-tables"`
+	ColumnType     string   `json:"column-type"`
+	Format         string
 }
 
 // LoadConfig reads the config file, applies CLI arguments as
@@ -104,6 +105,9 @@ func (config *Config) applyDefaults() {
 	}
 	if config.ColumnType == "" {
 		config.ColumnType = "integer"
+	}
+	if config.MigrationTable == "" {
+		config.MigrationTable = "schema_migrations"
 	}
 }
 
