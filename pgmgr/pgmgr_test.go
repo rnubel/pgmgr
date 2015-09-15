@@ -369,13 +369,8 @@ func createDB(t *testing.T) error {
 }
 
 func clearMigrationFolder(t *testing.T) {
-	if err := testSh(t, "rm", []string{"-r", migrationFolder}); err != nil {
-		t.Fatalf("Could not remove directory %s: %s", migrationFolder, err)
-	}
-
-	if err := testSh(t, "mkdir", []string{migrationFolder}); err != nil {
-		t.Fatalf("Could not create directory %s: %s", migrationFolder, err)
-	}
+	testSh(t, "rm", []string{"-r", migrationFolder})
+	testSh(t, "mkdir", []string{migrationFolder})
 }
 
 func writeMigration(t *testing.T, name, contents string) {
