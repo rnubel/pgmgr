@@ -133,7 +133,7 @@ func TestInitialize(t *testing.T) {
 	// Default config should create public.schema_migrations
 	resetDB(t)
 
-	if err := pgmgr.Initialize(config); err != nil {
+	if err := Initialize(config); err != nil {
 		t.Fatal("Initialize failed: ", err)
 	}
 
@@ -143,7 +143,7 @@ func TestInitialize(t *testing.T) {
 	resetDB(t)
 	config.MigrationTable = "applied_migrations"
 
-	if err := pgmgr.Initialize(config); err != nil {
+	if err := Initialize(config); err != nil {
 		t.Fatal("Initialize failed: ", err)
 	}
 
@@ -153,7 +153,7 @@ func TestInitialize(t *testing.T) {
 	// created if it does not yet exist.
 	resetDB(t)
 	config.MigrationTable = "pgmgr.applied_migrations"
-	if err := pgmgr.Initialize(config); err != nil {
+	if err := Initialize(config); err != nil {
 		t.Fatal("Initialize failed: ", err)
 	}
 
@@ -163,7 +163,7 @@ func TestInitialize(t *testing.T) {
 	// that's fine too.
 	resetDB(t)
 	psqlMustExec(t, `CREATE SCHEMA pgmgr;`)
-	if err := pgmgr.Initialize(config); err != nil {
+	if err := Initialize(config); err != nil {
 		t.Fatal("Initialize failed: ", err)
 	}
 
@@ -212,7 +212,6 @@ func TestColumnTypeString(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	// start with an empty DB
 	resetDB(t)
 	clearMigrationFolder(t)
 
@@ -269,7 +268,6 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestMigrateColumnTypeString(t *testing.T) {
-	// start with an empty DB
 	resetDB(t)
 	clearMigrationFolder(t)
 
@@ -315,7 +313,6 @@ func TestMigrateColumnTypeString(t *testing.T) {
 }
 
 func TestMigrateNoTransaction(t *testing.T) {
-	// start with an empty DB
 	resetDB(t)
 	clearMigrationFolder(t)
 
@@ -327,6 +324,27 @@ func TestMigrateNoTransaction(t *testing.T) {
 	err := Migrate(globalConfig())
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMigrateCustomMigrationTable(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER);`)
+
+	config := globalConfig()
+	config.MigrationTable = "pgmgr.migrations"
+	if err := Migrate(config); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != 1 {
+		t.Fatal("Expected version 1, got ", v)
 	}
 }
 

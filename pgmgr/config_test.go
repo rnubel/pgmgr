@@ -126,3 +126,15 @@ func TestValidation(t *testing.T) {
 		t.Fatal("LoadConfig should prevent Format=datetime when ColumnType=integer")
 	}
 }
+
+func TestQuotedMigrationTable(t *testing.T) {
+	c := &Config{MigrationTable: "abc"}
+	if c.quotedMigrationTable() != `"abc"` {
+		t.Fatal(`Migration table should be "abc", got`, c.quotedMigrationTable())
+	}
+
+	c.MigrationTable = "abc.def"
+	if c.quotedMigrationTable() != `"abc"."def"` {
+		t.Fatal(`Schema-qualified migration table should be "abc"."def", got`, c.quotedMigrationTable())
+	}
+}
