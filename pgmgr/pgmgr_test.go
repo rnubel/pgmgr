@@ -28,37 +28,38 @@ func globalConfig() *pgmgr.Config {
 }
 
 func TestCreate(t *testing.T) {
-	testSh(t, "dropdb", []string{testDBName})
-	err := pgmgr.Create(globalConfig())
+	if err := dropDB(t); err != nil {
+		t.Fatal("dropdb failed: ", err)
+	}
 
-	if err != nil {
+	if err := pgmgr.Create(globalConfig()); err != nil {
 		t.Log(err)
 		t.Fatal("Could not create database")
 	}
 
 	// if we can't remove that db, it couldn't have been created by us above.
-	if err = testSh(t, "dropdb", []string{testDBName}); err != nil {
+	if err := dropDB(t); err != nil {
 		t.Fatal("database doesn't seem to have been created!")
 	}
 }
 
 func TestDrop(t *testing.T) {
-	testSh(t, "createdb", []string{testDBName})
-	err := pgmgr.Drop(globalConfig())
+	if err := createDB(t); err != nil {
+		t.Fatal("createdb failed: ", err)
+	}
 
-	if err != nil {
+	if err := pgmgr.Drop(globalConfig()); err != nil {
 		t.Log(err)
 		t.Fatal("Could not drop database")
 	}
 
-	if err = testSh(t, "createdb", []string{testDBName}); err != nil {
+	if err := createDB(t); err != nil {
 		t.Fatal("database doesn't seem to have been dropped!")
 	}
 }
 
 func TestDump(t *testing.T) {
-	testSh(t, "dropdb", []string{testDBName})
-	testSh(t, "createdb", []string{testDBName})
+	resetDB(t)
 	testSh(t, "psql", []string{"-d", testDBName, "-c", "CREATE TABLE bars (bar_id INTEGER);"})
 	testSh(t, "psql", []string{"-d", testDBName, "-c", "INSERT INTO bars (bar_id) VALUES (123), (456);"})
 	testSh(t, "psql", []string{"-d", testDBName, "-c", "CREATE TABLE foos (foo_id INTEGER);"})
@@ -110,8 +111,7 @@ func TestDump(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	testSh(t, "dropdb", []string{testDBName})
-	testSh(t, "createdb", []string{testDBName})
+	resetDB(t)
 
 	ioutil.WriteFile(dumpFile, []byte(`
 		CREATE TABLE foos (foo_id INTEGER);
@@ -133,8 +133,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	testSh(t, "dropdb", []string{testDBName})
-	testSh(t, "createdb", []string{testDBName})
+	resetDB(t)
 
 	version, err := pgmgr.Version(globalConfig())
 
@@ -159,8 +158,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestColumnTypeString(t *testing.T) {
-	testSh(t, "dropdb", []string{testDBName})
-	testSh(t, "createdb", []string{testDBName})
+	resetDB(t)
 
 	config := globalConfig()
 	config.ColumnType = "string"
@@ -179,8 +177,7 @@ func TestColumnTypeString(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	// start with an empty DB
-	testSh(t, "dropdb", []string{testDBName})
-	testSh(t, "createdb", []string{testDBName})
+	resetDB(t)
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
@@ -250,8 +247,7 @@ func TestMigrate(t *testing.T) {
 
 func TestMigrateColumnTypeString(t *testing.T) {
 	// start with an empty DB
-	testSh(t, "dropdb", []string{testDBName})
-	testSh(t, "createdb", []string{testDBName})
+	resetDB(t)
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
@@ -300,8 +296,7 @@ func TestMigrateColumnTypeString(t *testing.T) {
 
 func TestMigrateNoTransaction(t *testing.T) {
 	// start with an empty DB
-	testSh(t, "dropdb", []string{testDBName})
-	testSh(t, "createdb", []string{testDBName})
+	resetDB(t)
 	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
 	testSh(t, "mkdir", []string{"/tmp/migrations"})
 
@@ -371,4 +366,22 @@ func testSh(t *testing.T, command string, args []string) error {
 	}
 
 	return nil
+}
+
+func resetDB(t *testing.T) {
+	if err := dropDB(t); err != nil {
+		t.Fatal("dropdb failed: ", err)
+	}
+
+	if err := createDB(t); err != nil {
+		t.Fatal("createdb failed: ", err)
+	}
+}
+
+func dropDB(t *testing.T) error {
+	return testSh(t, "dropdb", []string{testDBName})
+}
+
+func createDB(t *testing.T) error {
+	return testSh(t, "createdb", []string{testDBName})
 }
