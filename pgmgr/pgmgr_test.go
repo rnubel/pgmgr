@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"../pgmgr"
 )
 
 const (
@@ -19,8 +17,8 @@ const (
 	dumpFile        = "/tmp/pgmgr_dump.sql"
 )
 
-func globalConfig() *pgmgr.Config {
-	return &pgmgr.Config{
+func globalConfig() *Config {
+	return &Config{
 		Database:        testDBName,
 		Host:            "localhost",
 		Port:            5432,
@@ -34,7 +32,7 @@ func TestCreate(t *testing.T) {
 		t.Fatal("dropdb failed: ", err)
 	}
 
-	if err := pgmgr.Create(globalConfig()); err != nil {
+	if err := Create(globalConfig()); err != nil {
 		t.Log(err)
 		t.Fatal("Could not create database")
 	}
@@ -50,7 +48,7 @@ func TestDrop(t *testing.T) {
 		t.Fatal("createdb failed: ", err)
 	}
 
-	if err := pgmgr.Drop(globalConfig()); err != nil {
+	if err := Drop(globalConfig()); err != nil {
 		t.Log(err)
 		t.Fatal("Could not drop database")
 	}
@@ -68,7 +66,7 @@ func TestDump(t *testing.T) {
 	psqlMustExec(t, `INSERT INTO foos (foo_id) VALUES (789);`)
 
 	c := globalConfig()
-	err := pgmgr.Dump(c)
+	err := Dump(c)
 
 	if err != nil {
 		t.Log(err)
@@ -90,7 +88,7 @@ func TestDump(t *testing.T) {
 	}
 
 	c.SeedTables = append(c.SeedTables, "foos")
-	err = pgmgr.Dump(c)
+	err = Dump(c)
 
 	if err != nil {
 		t.Log(err)
@@ -120,7 +118,7 @@ func TestLoad(t *testing.T) {
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
 	`), 0644)
 
-	err := pgmgr.Load(globalConfig())
+	err := Load(globalConfig())
 
 	if err != nil {
 		t.Log(err)
@@ -133,7 +131,7 @@ func TestLoad(t *testing.T) {
 func TestVersion(t *testing.T) {
 	resetDB(t)
 
-	version, err := pgmgr.Version(globalConfig())
+	version, err := Version(globalConfig())
 
 	if err != nil {
 		t.Log(err)
@@ -144,10 +142,10 @@ func TestVersion(t *testing.T) {
 		t.Fatal("expected version to be -1 before table exists, got", version)
 	}
 
-	pgmgr.Initialize(globalConfig())
+	Initialize(globalConfig())
 	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES (1);`)
 
-	version, err = pgmgr.Version(globalConfig())
+	version, err = Version(globalConfig())
 	if version != 1 {
 		t.Fatal("expected version to be 1, got", version)
 	}
@@ -158,10 +156,10 @@ func TestColumnTypeString(t *testing.T) {
 
 	config := globalConfig()
 	config.ColumnType = "string"
-	pgmgr.Initialize(config)
+	Initialize(config)
 
 	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES ('20150910120933');`)
-	version, err := pgmgr.Version(config)
+	version, err := Version(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +182,7 @@ func TestMigrate(t *testing.T) {
 
 	writeMigration(t, "002_this_is_a_migration.down.sql", `DROP TABLE foos;`)
 
-	err := pgmgr.Migrate(globalConfig())
+	err := Migrate(globalConfig())
 
 	if err != nil {
 		t.Log(err)
@@ -192,7 +190,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	// test simple idempotency
-	err = pgmgr.Migrate(globalConfig())
+	err = Migrate(globalConfig())
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Running migrations again was not idempotent!")
@@ -206,7 +204,7 @@ func TestMigrate(t *testing.T) {
 		INSERT INTO bars (bar_id) VALUES (4), (5), (6);
 	`)
 
-	err = pgmgr.Migrate(globalConfig())
+	err = Migrate(globalConfig())
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not apply second migration!")
@@ -215,13 +213,13 @@ func TestMigrate(t *testing.T) {
 	psqlMustExec(t, `SELECT * FROM bars;`)
 
 	// rollback the initial migration, since it has the latest version
-	err = pgmgr.Rollback(globalConfig())
+	err = Rollback(globalConfig())
 
 	if err := psqlExec(t, `SELECT * FROM foos;`); err == nil {
 		t.Fatal("Should not have been able to select from foos table")
 	}
 
-	v, err := pgmgr.Version(globalConfig())
+	v, err := Version(globalConfig())
 	if err != nil || v != 1 {
 		t.Log(err)
 		t.Fatal("Rollback did not reset version! Still on version ", v)
@@ -242,12 +240,12 @@ func TestMigrateColumnTypeString(t *testing.T) {
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
 	`)
 
-	err := pgmgr.Migrate(config)
+	err := Migrate(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	v, err := pgmgr.Version(config)
+	v, err := Version(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,12 +257,12 @@ func TestMigrateColumnTypeString(t *testing.T) {
 	// migrate down
 	writeMigration(t, "20150910120933_some_migration.down.sql", `DROP TABLE foos;`)
 
-	err = pgmgr.Rollback(config)
+	err = Rollback(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	v, err = pgmgr.Version(config)
+	v, err = Version(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +282,7 @@ func TestMigrateNoTransaction(t *testing.T) {
 	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER);`)
 	writeMigration(t, "002_index_foos.no_txn.up.sql", `CREATE INDEX CONCURRENTLY idx_foo_id ON foos(foo_id);`)
 
-	err := pgmgr.Migrate(globalConfig())
+	err := Migrate(globalConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +299,7 @@ func TestCreateMigration(t *testing.T) {
 	}
 
 	expectedVersion := time.Now().Unix()
-	err := pgmgr.CreateMigration(globalConfig(), "new_migration", false)
+	err := CreateMigration(globalConfig(), "new_migration", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +310,7 @@ func TestCreateMigration(t *testing.T) {
 	expectedStringVersion := time.Now().Format(datetimeFormat)
 	config := globalConfig()
 	config.Format = "datetime"
-	err = pgmgr.CreateMigration(config, "rails_style", false)
+	err = CreateMigration(config, "rails_style", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +318,7 @@ func TestCreateMigration(t *testing.T) {
 	assertFileExists(fmt.Sprint(expectedStringVersion, "_rails_style.up.sql"))
 	assertFileExists(fmt.Sprint(expectedStringVersion, "_rails_style.down.sql"))
 
-	err = pgmgr.CreateMigration(config, "create_index", true)
+	err = CreateMigration(config, "create_index", true)
 	if err != nil {
 		t.Fatal(err)
 	}

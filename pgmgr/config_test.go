@@ -3,8 +3,6 @@ package pgmgr
 import (
 	"os"
 	"testing"
-
-	"../pgmgr"
 )
 
 // create a mock to replace cli.Context
@@ -25,9 +23,9 @@ func (t *TestContext) StringSlice(key string) []string {
 }
 
 func TestDefaults(t *testing.T) {
-	c := &pgmgr.Config{}
+	c := &Config{}
 
-	pgmgr.LoadConfig(c, &TestContext{})
+	LoadConfig(c, &TestContext{})
 
 	if c.Port != 5432 {
 		t.Fatal("config's port should default to 5432")
@@ -47,7 +45,7 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestOverlays(t *testing.T) {
-	c := &pgmgr.Config{}
+	c := &Config{}
 	ctx := &TestContext{IntVals: make(map[string]int)}
 
 	// should prefer the value from ctx, since
@@ -56,14 +54,14 @@ func TestOverlays(t *testing.T) {
 	ctx.IntVals["port"] = 456
 	os.Setenv("PGPORT", "789")
 
-	pgmgr.LoadConfig(c, ctx)
+	LoadConfig(c, ctx)
 
 	if c.Port != 456 {
 		t.Fatal("config's port should come from the context, but was", c.Port)
 	}
 
 	// reset
-	c = &pgmgr.Config{}
+	c = &Config{}
 	ctx = &TestContext{IntVals: make(map[string]int)}
 
 	// should prefer the value from PGPORT, since
@@ -71,14 +69,14 @@ func TestOverlays(t *testing.T) {
 	c.Port = 123
 	os.Setenv("PGPORT", "789")
 
-	pgmgr.LoadConfig(c, ctx)
+	LoadConfig(c, ctx)
 
 	if c.Port != 789 {
 		t.Fatal("config's port should come from PGPORT, but was", c.Port)
 	}
 
 	// reset
-	c = &pgmgr.Config{}
+	c = &Config{}
 	ctx = &TestContext{IntVals: make(map[string]int)}
 
 	// should prefer the value in the struct, since
@@ -86,7 +84,7 @@ func TestOverlays(t *testing.T) {
 	c.Port = 123
 	os.Setenv("PGPORT", "")
 
-	pgmgr.LoadConfig(c, ctx)
+	LoadConfig(c, ctx)
 
 	if c.Port != 123 {
 		t.Fatal("config's port should not change, but was", c.Port)
@@ -94,10 +92,10 @@ func TestOverlays(t *testing.T) {
 }
 
 func TestURL(t *testing.T) {
-	c := &pgmgr.Config{}
+	c := &Config{}
 	c.URL = "postgres://foo@bar:5431/testdb"
 
-	pgmgr.LoadConfig(c, &TestContext{})
+	LoadConfig(c, &TestContext{})
 
 	if c.Username != "foo" || c.Host != "bar" || c.Port != 5431 || c.Database != "testdb" {
 		t.Fatal("config did not populate itself from the given URL:", c)
@@ -105,22 +103,22 @@ func TestURL(t *testing.T) {
 }
 
 func TestValidation(t *testing.T) {
-	c := &pgmgr.Config{}
+	c := &Config{}
 	c.Format = "wrong"
 
-	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+	if err := LoadConfig(c, &TestContext{}); err == nil {
 		t.Fatal("LoadConfig should reject invalid Format value")
 	}
 
 	c.Format = ""
 	c.ColumnType = "wrong"
-	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+	if err := LoadConfig(c, &TestContext{}); err == nil {
 		t.Fatal("LoadConfig should reject invalid ColumnType value")
 	}
 
 	c.Format = "datetime"
 	c.ColumnType = "integer"
-	if err := pgmgr.LoadConfig(c, &TestContext{}); err == nil {
+	if err := LoadConfig(c, &TestContext{}); err == nil {
 		t.Fatal("LoadConfig should prevent Format=datetime when ColumnType=integer")
 	}
 }
