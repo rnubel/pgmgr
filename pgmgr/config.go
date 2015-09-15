@@ -8,6 +8,9 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
+
+	"github.com/lib/pq"
 )
 
 // Something that stores key-value pairs of various types,
@@ -170,4 +173,21 @@ func (config *Config) validate() error {
 	}
 
 	return nil
+}
+
+func (config *Config) quotedMigrationTable() string {
+	if !strings.Contains(config.MigrationTable, ".") {
+		return pq.QuoteIdentifier(config.MigrationTable)
+	}
+
+	tokens := strings.SplitN(config.MigrationTable, ".", 2)
+	return pq.QuoteIdentifier(tokens[0]) + "." + pq.QuoteIdentifier(tokens[1])
+}
+
+func (config *Config) versionColumnType() string {
+	if config.ColumnType == "string" {
+		return "CHARACTER VARYING (255)"
+	}
+
+	return "INTEGER"
 }

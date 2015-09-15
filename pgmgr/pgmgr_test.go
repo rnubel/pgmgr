@@ -24,6 +24,7 @@ func globalConfig() *Config {
 		Port:            5432,
 		DumpFile:        dumpFile,
 		MigrationFolder: migrationFolder,
+		MigrationTable:  "schema_migrations",
 	}
 }
 
@@ -124,6 +125,49 @@ func TestLoad(t *testing.T) {
 	}
 
 	psqlMustExec(t, `SELECT * FROM foos;`)
+}
+
+func TestInitialize(t *testing.T) {
+	config := globalConfig()
+
+	// Default config should create public.schema_migrations
+	resetDB(t)
+
+	if err := pgmgr.Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
+	}
+
+	psqlMustExec(t, `SELECT * FROM public.schema_migrations;`)
+
+	// If we specify a table, it should create public.<table_name>
+	resetDB(t)
+	config.MigrationTable = "applied_migrations"
+
+	if err := pgmgr.Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
+	}
+
+	psqlMustExec(t, `SELECT * FROM public.applied_migrations;`)
+
+	// If we specify a schema-qualified table, the schema should be
+	// created if it does not yet exist.
+	resetDB(t)
+	config.MigrationTable = "pgmgr.applied_migrations"
+	if err := pgmgr.Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
+	}
+
+	psqlMustExec(t, `SELECT * FROM pgmgr.applied_migrations`)
+
+	// If we specify a schema-qualified, and the schema already existed,
+	// that's fine too.
+	resetDB(t)
+	psqlMustExec(t, `CREATE SCHEMA pgmgr;`)
+	if err := pgmgr.Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
+	}
+
+	psqlMustExec(t, `SELECT * FROM pgmgr.applied_migrations`)
 }
 
 func TestVersion(t *testing.T) {

@@ -191,14 +191,16 @@ func Initialize(c *Config) error {
 		return err
 	}
 
-	var statement string
-	if c.ColumnType == "string" {
-		statement = "CREATE TABLE schema_migrations (version CHARACTER VARYING(255) NOT NULL UNIQUE)"
-	} else {
-		statement = "CREATE TABLE schema_migrations (version INTEGER NOT NULL UNIQUE)"
+	if err := createSchemaUnlessExists(c, db); err != nil {
+		return err
 	}
 
-	_, err = db.Exec(statement)
+	_, err = db.Exec(fmt.Sprintf(
+		"CREATE TABLE %s (version %s NOT NULL UNIQUE);",
+		c.quotedMigrationTable(),
+		c.versionColumnType(),
+	))
+
 	if err != nil {
 		return err
 	}
@@ -313,6 +315,32 @@ func applyMigration(c *Config, m Migration, direction int) error {
 	}
 
 	return nil
+}
+
+func createSchemaUnlessExists(c *Config, db *sql.DB) error {
+	// If there's no schema name in the config, we don't need to create the schema.
+	if !strings.Contains(c.MigrationTable, ".") {
+		return nil
+	}
+
+	var exists bool
+
+	schema := strings.SplitN(c.MigrationTable, ".", 2)[0]
+	err := db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = $1)`,
+		schema,
+	).Scan(&exists)
+
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		return nil
+	}
+
+	_, err = db.Exec(fmt.Sprintf("CREATE SCHEMA %s;", pq.QuoteIdentifier(schema)))
+	return err
 }
 
 func insertSchemaVersion(c *Config, tx execer, version int64) error {
