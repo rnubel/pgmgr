@@ -98,6 +98,9 @@ The values above map to these environment variables:
 * `PGMGR_DATABASE`
 * `PGMGR_DUMP_FILE` (the filepath to dump the database definition out to)
 * `PGMGR_SEED_TABLES` (tables to include data with when dumping the database)
+* `PGMGR_COLUMN_TYPE`
+* `PGMGR_FORMAT`
+* `PGMGR_MIGRATION_TABLE`
 
 If you prefer to use a connection string, you can set `PGMGR_URL` which will supersede the other configuration settings, e.g.:
 
