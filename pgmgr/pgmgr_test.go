@@ -28,9 +28,7 @@ func globalConfig() *Config {
 }
 
 func TestCreate(t *testing.T) {
-	if err := dropDB(t); err != nil {
-		t.Fatal("dropdb failed: ", err)
-	}
+	dropDB(t)
 
 	if err := Create(globalConfig()); err != nil {
 		t.Log(err)
