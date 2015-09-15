@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,8 +14,9 @@ import (
 )
 
 const (
-	testDBName = "pgmgr_testdb"
-	dumpFile   = "/tmp/pgmgr_dump.sql"
+	testDBName      = "pgmgr_testdb"
+	migrationFolder = "/tmp/migrations/"
+	dumpFile        = "/tmp/pgmgr_dump.sql"
 )
 
 func globalConfig() *pgmgr.Config {
@@ -23,7 +25,7 @@ func globalConfig() *pgmgr.Config {
 		Host:            "localhost",
 		Port:            5432,
 		DumpFile:        dumpFile,
-		MigrationFolder: "/tmp/migrations/",
+		MigrationFolder: migrationFolder,
 	}
 }
 
@@ -178,18 +180,15 @@ func TestColumnTypeString(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	// start with an empty DB
 	resetDB(t)
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	clearMigrationFolder(t)
 
 	// add our first migration
-	ioutil.WriteFile("/tmp/migrations/002_this_is_a_migration.up.sql", []byte(`
+	writeMigration(t, "002_this_is_a_migration.up.sql", `
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
-	`), 0644)
+	`)
 
-	ioutil.WriteFile("/tmp/migrations/002_this_is_a_migration.down.sql", []byte(`
-		DROP TABLE foos;
-	`), 0644)
+	writeMigration(t, "002_this_is_a_migration.down.sql", `DROP TABLE foos;`)
 
 	err := pgmgr.Migrate(globalConfig())
 
@@ -212,10 +211,10 @@ func TestMigrate(t *testing.T) {
 	}
 
 	// add a new migration with an older version, as if another dev's branch was merged in
-	ioutil.WriteFile("/tmp/migrations/001_this_is_an_older_migration.up.sql", []byte(`
+	writeMigration(t, "001_this_is_an_older_migration.up.sql", `
 		CREATE TABLE bars (bar_id INTEGER);
 		INSERT INTO bars (bar_id) VALUES (4), (5), (6);
-	`), 0644)
+	`)
 
 	err = pgmgr.Migrate(globalConfig())
 	if err != nil {
@@ -248,17 +247,16 @@ func TestMigrate(t *testing.T) {
 func TestMigrateColumnTypeString(t *testing.T) {
 	// start with an empty DB
 	resetDB(t)
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	clearMigrationFolder(t)
 
 	config := globalConfig()
 	config.ColumnType = "string"
 
 	// migrate up
-	ioutil.WriteFile("/tmp/migrations/20150910120933_some_migration.up.sql", []byte(`
+	writeMigration(t, "20150910120933_some_migration.up.sql", `
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
-	`), 0644)
+	`)
 
 	err := pgmgr.Migrate(config)
 	if err != nil {
@@ -275,9 +273,7 @@ func TestMigrateColumnTypeString(t *testing.T) {
 	}
 
 	// migrate down
-	ioutil.WriteFile("/tmp/migrations/20150910120933_some_migration.down.sql", []byte(`
-        DROP TABLE foos;
-	`), 0644)
+	writeMigration(t, "20150910120933_some_migration.down.sql", `DROP TABLE foos;`)
 
 	err = pgmgr.Rollback(config)
 	if err != nil {
@@ -297,18 +293,12 @@ func TestMigrateColumnTypeString(t *testing.T) {
 func TestMigrateNoTransaction(t *testing.T) {
 	// start with an empty DB
 	resetDB(t)
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	clearMigrationFolder(t)
 
 	// CREATE INDEX CONCURRENTLY can not run inside a transaction, so we can assert
 	// that no transaction was used by verifying it ran successfully.
-	ioutil.WriteFile("/tmp/migrations/001_create_foos.up.sql", []byte(`
-		CREATE TABLE foos (foo_id INTEGER);
-	`), 0644)
-
-	ioutil.WriteFile("/tmp/migrations/002_index_foos.no_txn.up.sql", []byte(`
-		CREATE INDEX CONCURRENTLY idx_foo_id ON foos(foo_id);
-	`), 0644)
+	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER);`)
+	writeMigration(t, "002_index_foos.no_txn.up.sql", `CREATE INDEX CONCURRENTLY idx_foo_id ON foos(foo_id);`)
 
 	err := pgmgr.Migrate(globalConfig())
 	if err != nil {
@@ -317,11 +307,10 @@ func TestMigrateNoTransaction(t *testing.T) {
 }
 
 func TestCreateMigration(t *testing.T) {
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	clearMigrationFolder(t)
 
 	assertFileExists := func(filename string) {
-		err := testSh(t, "stat", []string{filepath.Join("/tmp/migrations", filename)})
+		err := testSh(t, "stat", []string{filepath.Join(migrationFolder, filename)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -384,4 +373,22 @@ func dropDB(t *testing.T) error {
 
 func createDB(t *testing.T) error {
 	return testSh(t, "createdb", []string{testDBName})
+}
+
+func clearMigrationFolder(t *testing.T) {
+	if err := testSh(t, "rm", []string{"-r", migrationFolder}); err != nil {
+		t.Fatalf("Could not remove directory %s: %s", migrationFolder, err)
+	}
+
+	if err := testSh(t, "mkdir", []string{migrationFolder}); err != nil {
+		t.Fatalf("Could not create directory %s: %s", migrationFolder, err)
+	}
+}
+
+func writeMigration(t *testing.T, name, contents string) {
+	filename := path.Join(migrationFolder, name)
+	err := ioutil.WriteFile(filename, []byte(contents), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write %s: %s", filename, err)
+	}
 }
