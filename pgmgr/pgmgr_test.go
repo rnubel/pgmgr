@@ -4,70 +4,75 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"../pgmgr"
 )
 
-func globalConfig() *pgmgr.Config {
-	return &pgmgr.Config{
-		Database:        "testdb",
+const (
+	testDBName      = "pgmgr_testdb"
+	migrationFolder = "/tmp/migrations/"
+	dumpFile        = "/tmp/pgmgr_dump.sql"
+)
+
+func globalConfig() *Config {
+	return &Config{
+		Database:        testDBName,
 		Host:            "localhost",
 		Port:            5432,
-		DumpFile:        "/tmp/dump.sql",
-		MigrationFolder: "/tmp/migrations/",
+		DumpFile:        dumpFile,
+		MigrationFolder: migrationFolder,
+		MigrationTable:  "schema_migrations",
 	}
 }
 
 func TestCreate(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	err := pgmgr.Create(globalConfig())
+	dropDB(t)
 
-	if err != nil {
+	if err := Create(globalConfig()); err != nil {
 		t.Log(err)
 		t.Fatal("Could not create database")
 	}
 
 	// if we can't remove that db, it couldn't have been created by us above.
-	if err = testSh(t, "dropdb", []string{"testdb"}); err != nil {
+	if err := dropDB(t); err != nil {
 		t.Fatal("database doesn't seem to have been created!")
 	}
 }
 
 func TestDrop(t *testing.T) {
-	testSh(t, "createdb", []string{"testdb"})
-	err := pgmgr.Drop(globalConfig())
+	if err := createDB(t); err != nil {
+		t.Fatal("createdb failed: ", err)
+	}
 
-	if err != nil {
+	if err := Drop(globalConfig()); err != nil {
 		t.Log(err)
 		t.Fatal("Could not drop database")
 	}
 
-	if err = testSh(t, "createdb", []string{"testdb"}); err != nil {
+	if err := createDB(t); err != nil {
 		t.Fatal("database doesn't seem to have been dropped!")
 	}
 }
 
 func TestDump(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "CREATE TABLE bars (bar_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO bars (bar_id) VALUES (123), (456);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "CREATE TABLE foos (foo_id INTEGER);"})
-	testSh(t, "psql", []string{"-d", "testdb", "-c", "INSERT INTO foos (foo_id) VALUES (789);"})
+	resetDB(t)
+	psqlMustExec(t, `CREATE TABLE bars (bar_id INTEGER);`)
+	psqlMustExec(t, `INSERT INTO bars (bar_id) VALUES (123), (456);`)
+	psqlMustExec(t, `CREATE TABLE foos (foo_id INTEGER);`)
+	psqlMustExec(t, `INSERT INTO foos (foo_id) VALUES (789);`)
 
 	c := globalConfig()
-	err := pgmgr.Dump(c)
+	err := Dump(c)
 
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not dump database to file")
 	}
 
-	file, err := ioutil.ReadFile("/tmp/dump.sql")
+	file, err := ioutil.ReadFile(dumpFile)
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not read dump")
@@ -82,14 +87,14 @@ func TestDump(t *testing.T) {
 	}
 
 	c.SeedTables = append(c.SeedTables, "foos")
-	err = pgmgr.Dump(c)
+	err = Dump(c)
 
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not dump database to file")
 	}
 
-	file, err = ioutil.ReadFile("/tmp/dump.sql")
+	file, err = ioutil.ReadFile(dumpFile)
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not read dump")
@@ -105,33 +110,70 @@ func TestDump(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	resetDB(t)
 
-	ioutil.WriteFile("/tmp/dump.sql", []byte(`
+	ioutil.WriteFile(dumpFile, []byte(`
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
 	`), 0644)
 
-	err := pgmgr.Load(globalConfig())
+	err := Load(globalConfig())
 
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not load database from file")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
-	if err != nil {
-		t.Log(err)
-		t.Fatal("Could not query the table; schema didn't load, probably")
+	psqlMustExec(t, `SELECT * FROM foos;`)
+}
+
+func TestInitialize(t *testing.T) {
+	config := globalConfig()
+
+	// Default config should create public.schema_migrations
+	resetDB(t)
+
+	if err := Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
 	}
+
+	psqlMustExec(t, `SELECT * FROM public.schema_migrations;`)
+
+	// If we specify a table, it should create public.<table_name>
+	resetDB(t)
+	config.MigrationTable = "applied_migrations"
+
+	if err := Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
+	}
+
+	psqlMustExec(t, `SELECT * FROM public.applied_migrations;`)
+
+	// If we specify a schema-qualified table, the schema should be
+	// created if it does not yet exist.
+	resetDB(t)
+	config.MigrationTable = "pgmgr.applied_migrations"
+	if err := Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
+	}
+
+	psqlMustExec(t, `SELECT * FROM pgmgr.applied_migrations`)
+
+	// If we specify a schema-qualified table, and the schema already existed,
+	// that's fine too.
+	resetDB(t)
+	psqlMustExec(t, `CREATE SCHEMA pgmgr;`)
+	if err := Initialize(config); err != nil {
+		t.Fatal("Initialize failed: ", err)
+	}
+
+	psqlMustExec(t, `SELECT * FROM pgmgr.applied_migrations`)
 }
 
 func TestVersion(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	resetDB(t)
 
-	version, err := pgmgr.Version(globalConfig())
+	version, err := Version(globalConfig())
 
 	if err != nil {
 		t.Log(err)
@@ -142,27 +184,24 @@ func TestVersion(t *testing.T) {
 		t.Fatal("expected version to be -1 before table exists, got", version)
 	}
 
-	pgmgr.Initialize(globalConfig())
+	Initialize(globalConfig())
+	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES (1);`)
 
-	testSh(t, "psql", []string{"-e", "-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES (1)"})
-
-	version, err = pgmgr.Version(globalConfig())
-
+	version, err = Version(globalConfig())
 	if version != 1 {
 		t.Fatal("expected version to be 1, got", version)
 	}
 }
 
 func TestColumnTypeString(t *testing.T) {
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
+	resetDB(t)
 
 	config := globalConfig()
 	config.ColumnType = "string"
-	pgmgr.Initialize(config)
+	Initialize(config)
 
-	testSh(t, "psql", []string{"-e", "-d", "testdb", "-c", "INSERT INTO schema_migrations (version) VALUES ('20150910120933')"})
-	version, err := pgmgr.Version(config)
+	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES ('20150910120933');`)
+	version, err := Version(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,23 +212,18 @@ func TestColumnTypeString(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	// start with an empty DB
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	resetDB(t)
+	clearMigrationFolder(t)
 
 	// add our first migration
-	ioutil.WriteFile("/tmp/migrations/002_this_is_a_migration.up.sql", []byte(`
+	writeMigration(t, "002_this_is_a_migration.up.sql", `
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
-	`), 0644)
+	`)
 
-	ioutil.WriteFile("/tmp/migrations/002_this_is_a_migration.down.sql", []byte(`
-		DROP TABLE foos;
-	`), 0644)
+	writeMigration(t, "002_this_is_a_migration.down.sql", `DROP TABLE foos;`)
 
-	err := pgmgr.Migrate(globalConfig())
+	err := Migrate(globalConfig())
 
 	if err != nil {
 		t.Log(err)
@@ -197,46 +231,36 @@ func TestMigrate(t *testing.T) {
 	}
 
 	// test simple idempotency
-	err = pgmgr.Migrate(globalConfig())
+	err = Migrate(globalConfig())
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Running migrations again was not idempotent!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
-	if err != nil {
-		t.Log(err)
-		t.Fatal("Could not query the table; migration didn't apply, probably")
-	}
+	psqlMustExec(t, `SELECT * FROM foos;`)
 
 	// add a new migration with an older version, as if another dev's branch was merged in
-	ioutil.WriteFile("/tmp/migrations/001_this_is_an_older_migration.up.sql", []byte(`
+	writeMigration(t, "001_this_is_an_older_migration.up.sql", `
 		CREATE TABLE bars (bar_id INTEGER);
 		INSERT INTO bars (bar_id) VALUES (4), (5), (6);
-	`), 0644)
+	`)
 
-	err = pgmgr.Migrate(globalConfig())
+	err = Migrate(globalConfig())
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not apply second migration!")
 	}
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM bars;"})
-	if err != nil {
-		t.Log(err)
-		t.Fatal("Could not query the table; second migration didn't apply, probably")
-	}
+	psqlMustExec(t, `SELECT * FROM bars;`)
 
 	// rollback the initial migration, since it has the latest version
-	err = pgmgr.Rollback(globalConfig())
+	err = Rollback(globalConfig())
 
-	err = testSh(t, "psql", []string{"-d", "testdb", "-c", "SELECT * FROM foos;"})
-	if err == nil {
-		t.Log(err)
-		t.Fatal("Could query the table; migration didn't downgrade")
+	if err := psqlExec(t, `SELECT * FROM foos;`); err == nil {
+		t.Fatal("Should not have been able to select from foos table")
 	}
 
-	v, err := pgmgr.Version(globalConfig())
+	v, err := Version(globalConfig())
 	if err != nil || v != 1 {
 		t.Log(err)
 		t.Fatal("Rollback did not reset version! Still on version ", v)
@@ -244,27 +268,24 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestMigrateColumnTypeString(t *testing.T) {
-	// start with an empty DB
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	resetDB(t)
+	clearMigrationFolder(t)
 
 	config := globalConfig()
 	config.ColumnType = "string"
 
 	// migrate up
-	ioutil.WriteFile("/tmp/migrations/20150910120933_some_migration.up.sql", []byte(`
+	writeMigration(t, "20150910120933_some_migration.up.sql", `
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
-	`), 0644)
+	`)
 
-	err := pgmgr.Migrate(config)
+	err := Migrate(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	v, err := pgmgr.Version(config)
+	v, err := Version(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,16 +295,14 @@ func TestMigrateColumnTypeString(t *testing.T) {
 	}
 
 	// migrate down
-	ioutil.WriteFile("/tmp/migrations/20150910120933_some_migration.down.sql", []byte(`
-        DROP TABLE foos;
-	`), 0644)
+	writeMigration(t, "20150910120933_some_migration.down.sql", `DROP TABLE foos;`)
 
-	err = pgmgr.Rollback(config)
+	err = Rollback(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	v, err = pgmgr.Version(config)
+	v, err = Version(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,41 +313,53 @@ func TestMigrateColumnTypeString(t *testing.T) {
 }
 
 func TestMigrateNoTransaction(t *testing.T) {
-	// start with an empty DB
-	testSh(t, "dropdb", []string{"testdb"})
-	testSh(t, "createdb", []string{"testdb"})
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	resetDB(t)
+	clearMigrationFolder(t)
 
 	// CREATE INDEX CONCURRENTLY can not run inside a transaction, so we can assert
 	// that no transaction was used by verifying it ran successfully.
-	ioutil.WriteFile("/tmp/migrations/001_create_foos.up.sql", []byte(`
-		CREATE TABLE foos (foo_id INTEGER);
-	`), 0644)
+	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER);`)
+	writeMigration(t, "002_index_foos.no_txn.up.sql", `CREATE INDEX CONCURRENTLY idx_foo_id ON foos(foo_id);`)
 
-	ioutil.WriteFile("/tmp/migrations/002_index_foos.no_txn.up.sql", []byte(`
-		CREATE INDEX CONCURRENTLY idx_foo_id ON foos(foo_id);
-	`), 0644)
-
-	err := pgmgr.Migrate(globalConfig())
+	err := Migrate(globalConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
+func TestMigrateCustomMigrationTable(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER);`)
+
+	config := globalConfig()
+	config.MigrationTable = "pgmgr.migrations"
+	if err := Migrate(config); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != 1 {
+		t.Fatal("Expected version 1, got ", v)
+	}
+}
+
 func TestCreateMigration(t *testing.T) {
-	testSh(t, "rm", []string{"-r", "/tmp/migrations"})
-	testSh(t, "mkdir", []string{"/tmp/migrations"})
+	clearMigrationFolder(t)
 
 	assertFileExists := func(filename string) {
-		err := testSh(t, "stat", []string{filepath.Join("/tmp/migrations", filename)})
+		err := testSh(t, "stat", []string{filepath.Join(migrationFolder, filename)})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	expectedVersion := time.Now().Unix()
-	err := pgmgr.CreateMigration(globalConfig(), "new_migration", false)
+	err := CreateMigration(globalConfig(), "new_migration", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +370,7 @@ func TestCreateMigration(t *testing.T) {
 	expectedStringVersion := time.Now().Format(datetimeFormat)
 	config := globalConfig()
 	config.Format = "datetime"
-	err = pgmgr.CreateMigration(config, "rails_style", false)
+	err = CreateMigration(config, "rails_style", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +378,7 @@ func TestCreateMigration(t *testing.T) {
 	assertFileExists(fmt.Sprint(expectedStringVersion, "_rails_style.up.sql"))
 	assertFileExists(fmt.Sprint(expectedStringVersion, "_rails_style.down.sql"))
 
-	err = pgmgr.CreateMigration(config, "create_index", true)
+	err = CreateMigration(config, "create_index", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,4 +397,46 @@ func testSh(t *testing.T, command string, args []string) error {
 	}
 
 	return nil
+}
+
+func psqlExec(t *testing.T, statement string) error {
+	return testSh(t, "psql", []string{"-d", testDBName, "-c", statement})
+}
+
+func psqlMustExec(t *testing.T, statement string) {
+	err := psqlExec(t, statement)
+	if err != nil {
+		t.Fatalf("Failed to execute statement: '%s': %s", statement, err)
+	}
+}
+
+func resetDB(t *testing.T) {
+	if err := dropDB(t); err != nil {
+		t.Fatal("dropdb failed: ", err)
+	}
+
+	if err := createDB(t); err != nil {
+		t.Fatal("createdb failed: ", err)
+	}
+}
+
+func dropDB(t *testing.T) error {
+	return testSh(t, "dropdb", []string{testDBName})
+}
+
+func createDB(t *testing.T) error {
+	return testSh(t, "createdb", []string{testDBName})
+}
+
+func clearMigrationFolder(t *testing.T) {
+	testSh(t, "rm", []string{"-r", migrationFolder})
+	testSh(t, "mkdir", []string{migrationFolder})
+}
+
+func writeMigration(t *testing.T, name, contents string) {
+	filename := path.Join(migrationFolder, name)
+	err := ioutil.WriteFile(filename, []byte(contents), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write %s: %s", filename, err)
+	}
 }

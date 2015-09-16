@@ -172,13 +172,28 @@ func Version(c *Config) (int64, error) {
 
 	// if the table doesn't exist, we're at version -1
 	var hasTable bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE tablename='schema_migrations')").Scan(&hasTable)
+	if strings.Contains(c.MigrationTable, ".") {
+		tokens := strings.SplitN(c.MigrationTable, ".", 2)
+		err = db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname = $1 AND tablename = $2)`,
+			tokens[0], tokens[1],
+		).Scan(&hasTable)
+	} else {
+		err = db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE tablename = $1)`,
+			c.MigrationTable,
+		).Scan(&hasTable)
+	}
+
 	if hasTable != true {
 		return -1, err
 	}
 
 	var version int64
-	err = db.QueryRow("SELECT COALESCE(MAX(version)::text, '-1') FROM schema_migrations").Scan(&version)
+	err = db.QueryRow(fmt.Sprintf(
+		`SELECT COALESCE(MAX(version)::text, '-1') FROM %s`,
+		c.quotedMigrationTable(),
+	)).Scan(&version)
 
 	return version, err
 }
@@ -191,14 +206,16 @@ func Initialize(c *Config) error {
 		return err
 	}
 
-	var statement string
-	if c.ColumnType == "string" {
-		statement = "CREATE TABLE schema_migrations (version CHARACTER VARYING(255) NOT NULL UNIQUE)"
-	} else {
-		statement = "CREATE TABLE schema_migrations (version INTEGER NOT NULL UNIQUE)"
+	if err := createSchemaUnlessExists(c, db); err != nil {
+		return err
 	}
 
-	_, err = db.Exec(statement)
+	_, err = db.Exec(fmt.Sprintf(
+		"CREATE TABLE %s (version %s NOT NULL UNIQUE);",
+		c.quotedMigrationTable(),
+		c.versionColumnType(),
+	))
+
 	if err != nil {
 		return err
 	}
@@ -315,13 +332,48 @@ func applyMigration(c *Config, m Migration, direction int) error {
 	return nil
 }
 
+func createSchemaUnlessExists(c *Config, db *sql.DB) error {
+	// If there's no schema name in the config, we don't need to create the schema.
+	if !strings.Contains(c.MigrationTable, ".") {
+		return nil
+	}
+
+	var exists bool
+
+	schema := strings.SplitN(c.MigrationTable, ".", 2)[0]
+	err := db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = $1)`,
+		schema,
+	).Scan(&exists)
+
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		return nil
+	}
+
+	_, err = db.Exec(fmt.Sprintf(
+		"CREATE SCHEMA %s;",
+		pq.QuoteIdentifier(schema),
+	))
+	return err
+}
+
 func insertSchemaVersion(c *Config, tx execer, version int64) error {
-	_, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1) RETURNING version", typedVersion(c, version))
+	_, err := tx.Exec(
+		fmt.Sprintf(`INSERT INTO %s (version) VALUES ($1) RETURNING version;`, c.quotedMigrationTable()),
+		typedVersion(c, version),
+	)
 	return err
 }
 
 func deleteSchemaVersion(c *Config, tx execer, version int64) error {
-	_, err := tx.Exec("DELETE FROM schema_migrations WHERE version = $1", typedVersion(c, version))
+	_, err := tx.Exec(
+		fmt.Sprintf(`DELETE FROM %s WHERE version = $1`, c.quotedMigrationTable()),
+		typedVersion(c, version),
+	)
 	return err
 }
 
@@ -340,7 +392,11 @@ func migrationIsApplied(c *Config, version int64) (bool, error) {
 	}
 
 	var applied bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1);", version).Scan(&applied)
+	err = db.QueryRow(
+		fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM %s WHERE version = $1)`, c.quotedMigrationTable()),
+		version,
+	).Scan(&applied)
+
 	if err != nil {
 		return false, err
 	}

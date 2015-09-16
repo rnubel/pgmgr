@@ -8,6 +8,9 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
+
+	"github.com/lib/pq"
 )
 
 // Something that stores key-value pairs of various types,
@@ -33,9 +36,10 @@ type Config struct {
 	MigrationFolder string `json:"migration-folder"`
 
 	// options
-	SeedTables []string `json:"seed-tables"`
-	ColumnType string   `json:"column-type"`
-	Format     string
+	MigrationTable string   `json:"migration-table"`
+	SeedTables     []string `json:"seed-tables"`
+	ColumnType     string   `json:"column-type"`
+	Format         string
 }
 
 // LoadConfig reads the config file, applies CLI arguments as
@@ -105,6 +109,9 @@ func (config *Config) applyDefaults() {
 	if config.ColumnType == "" {
 		config.ColumnType = "integer"
 	}
+	if config.MigrationTable == "" {
+		config.MigrationTable = "schema_migrations"
+	}
 }
 
 func (config *Config) applyArguments(ctx argumentContext) {
@@ -166,4 +173,21 @@ func (config *Config) validate() error {
 	}
 
 	return nil
+}
+
+func (config *Config) quotedMigrationTable() string {
+	if !strings.Contains(config.MigrationTable, ".") {
+		return pq.QuoteIdentifier(config.MigrationTable)
+	}
+
+	tokens := strings.SplitN(config.MigrationTable, ".", 2)
+	return pq.QuoteIdentifier(tokens[0]) + "." + pq.QuoteIdentifier(tokens[1])
+}
+
+func (config *Config) versionColumnType() string {
+	if config.ColumnType == "string" {
+		return "CHARACTER VARYING (255)"
+	}
+
+	return "INTEGER"
 }

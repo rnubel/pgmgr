@@ -86,6 +86,24 @@ func main() {
 			EnvVar: "PGMGR_DUMP_FILE",
 		},
 		cli.StringFlag{
+			Name:   "column-type",
+			Value:  "integer",
+			Usage:  "column type to use in schema_migrations table; 'integer' or 'string'",
+			EnvVar: "PGMGR_COLUMN_TYPE",
+		},
+		cli.StringFlag{
+			Name:   "format",
+			Value:  "unix",
+			Usage:  "timestamp format for migrations; 'unix' or 'datetime'",
+			EnvVar: "PGMGR_FORMAT",
+		},
+		cli.StringFlag{
+			Name:   "migration-table",
+			Value:  "schema_migrations",
+			Usage:  "table to use for storing migration status; eg 'myschema.applied_migrations'",
+			EnvVar: "PGMGR_MIGRATION_TABLE",
+		},
+		cli.StringFlag{
 			Name:   "migration-folder",
 			Value:  "",
 			Usage:  "folder containing the migrations to apply",
