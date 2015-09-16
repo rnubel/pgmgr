@@ -134,7 +134,11 @@ func TestInitialize(t *testing.T) {
 	resetDB(t)
 
 	if err := Initialize(config); err != nil {
-		t.Fatal("Initialize failed: ", err)
+		t.Fatal("Initialize failed:", err)
+	}
+
+	if err := Initialize(config); err != nil {
+		t.Fatal("Initialize was not safe to run twice:", err)
 	}
 
 	psqlMustExec(t, `SELECT * FROM public.schema_migrations;`)
