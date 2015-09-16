@@ -96,8 +96,7 @@ func Migrate(c *Config) error {
 	}
 
 	// ensure the version table is created
-	_, err = getOrInitializeVersion(c)
-	if err != nil {
+	if err := Initialize(c); err != nil {
 		return err
 	}
 
@@ -170,23 +169,13 @@ func Version(c *Config) (int64, error) {
 		return -1, err
 	}
 
-	// if the table doesn't exist, we're at version -1
-	var hasTable bool
-	if strings.Contains(c.MigrationTable, ".") {
-		tokens := strings.SplitN(c.MigrationTable, ".", 2)
-		err = db.QueryRow(
-			`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname = $1 AND tablename = $2)`,
-			tokens[0], tokens[1],
-		).Scan(&hasTable)
-	} else {
-		err = db.QueryRow(
-			`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE tablename = $1)`,
-			c.MigrationTable,
-		).Scan(&hasTable)
+	exists, err := migrationTableExists(c, db)
+	if err != nil {
+		return -1, err
 	}
 
-	if hasTable != true {
-		return -1, err
+	if !exists {
+		return -1, nil
 	}
 
 	var version int64
@@ -198,7 +187,7 @@ func Version(c *Config) (int64, error) {
 	return version, err
 }
 
-// Initialize creates the schema_migrations table on what should be a new database.
+// Initialize creates the schema_migrations table if necessary.
 func Initialize(c *Config) error {
 	db, err := openConnection(c)
 	defer db.Close()
@@ -208,6 +197,15 @@ func Initialize(c *Config) error {
 
 	if err := createSchemaUnlessExists(c, db); err != nil {
 		return err
+	}
+
+	tableExists, err := migrationTableExists(c, db)
+	if err != nil {
+		return err
+	}
+
+	if tableExists {
+		return nil
 	}
 
 	_, err = db.Exec(fmt.Sprintf(
@@ -384,6 +382,26 @@ func typedVersion(c *Config, version int64) interface{} {
 	return version
 }
 
+func migrationTableExists(c *Config, db *sql.DB) (bool, error) {
+	var hasTable bool
+	var err error
+
+	if strings.Contains(c.MigrationTable, ".") {
+		tokens := strings.SplitN(c.MigrationTable, ".", 2)
+		err = db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE schemaname = $1 AND tablename = $2)`,
+			tokens[0], tokens[1],
+		).Scan(&hasTable)
+	} else {
+		err = db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_tables WHERE tablename = $1)`,
+			c.MigrationTable,
+		).Scan(&hasTable)
+	}
+
+	return hasTable, err
+}
+
 func migrationIsApplied(c *Config, version int64) (bool, error) {
 	db, err := openConnection(c)
 	defer db.Close()
@@ -402,17 +420,6 @@ func migrationIsApplied(c *Config, version int64) (bool, error) {
 	}
 
 	return applied, nil
-}
-
-func getOrInitializeVersion(c *Config) (int64, error) {
-	var v int64
-	if v, _ = Version(c); v < 0 {
-		if err := Initialize(c); err != nil {
-			return -1, err
-		}
-	}
-
-	return v, nil
 }
 
 func openConnection(c *Config) (*sql.DB, error) {
