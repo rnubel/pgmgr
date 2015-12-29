@@ -257,6 +257,20 @@ func TestMigrate(t *testing.T) {
 
 	psqlMustExec(t, `SELECT * FROM bars;`)
 
+	// Make a filename that would match a vim .swp file
+	writeMigration(t, ".003_this_is_an_older_migration.up.sql.swp", `
+		CREATE TABLE baz (baz_id INTEGER);
+		INSERT INTO baz (baz_id) VALUES (4), (5), (6);
+	`)
+
+	err = Migrate(globalConfig())
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Could not apply third migration!")
+	}
+
+	psqlMustNotExec(t, `SELECT * FROM baz;`)
+
 	// rollback the initial migration, since it has the latest version
 	err = Rollback(globalConfig())
 
@@ -411,6 +425,16 @@ func psqlMustExec(t *testing.T, statement string) {
 	err := psqlExec(t, statement)
 	if err != nil {
 		t.Fatalf("Failed to execute statement: '%s': %s", statement, err)
+	}
+}
+
+func psqlMustNotExec(t *testing.T, statement string) {
+	err := psqlExec(t, statement)
+
+	// If there is no error, the statement successfully executed.
+	// We don't want that to happen.
+	if err == nil {
+		t.Fatalf("SQL statement executed when it should not have: '%s'", statement)
 	}
 }
 

@@ -447,7 +447,7 @@ func migrations(c *Config, direction string) ([]Migration, error) {
 	}
 
 	for _, file := range files {
-		if match, _ := regexp.MatchString("[0-9]+_.+\\."+direction+"\\.sql", file.Name()); match {
+		if match, _ := regexp.MatchString("^[0-9]+_.+\\."+direction+"\\.sql$", file.Name()); match {
 			version, _ := strconv.ParseInt(re.FindString(file.Name()), 10, 64)
 			migrations = append(migrations, Migration{Filename: file.Name(), Version: version})
 		}
