@@ -266,7 +266,7 @@ func TestMigrate(t *testing.T) {
 	err = Migrate(globalConfig())
 	if err != nil {
 		t.Log(err)
-		t.Fatal("Could not apply third migration!")
+		t.Fatal("Migration returned an error instead of being skipped!")
 	}
 
 	psqlMustNotExec(t, `SELECT * FROM baz;`)
