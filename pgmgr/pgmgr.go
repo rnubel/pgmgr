@@ -25,6 +25,7 @@ const (
 
 const datetimeFormat = "20060102130405"
 
+// Migration directions used for error message building
 const (
 	MIGRATION = "migration"
 	ROLLBACK  = "rollback"
@@ -477,8 +478,8 @@ func shRead(command string, args []string) (*[]byte, error) {
 	return &output, err
 }
 
-func printFailedMigrationMessage(err error, migration_type string) {
+func printFailedMigrationMessage(err error, migrationType string) {
 	fmt.Fprintf(os.Stderr, err.Error())
 	fmt.Fprintf(os.Stderr, "\n\n")
-	fmt.Fprintf(os.Stderr, "ERROR! Aborting the "+migration_type+" process.")
+	fmt.Fprintf(os.Stderr, "ERROR! Aborting the "+migrationType+" process.")
 }
