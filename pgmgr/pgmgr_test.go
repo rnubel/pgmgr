@@ -409,13 +409,12 @@ func TestRollback(t *testing.T) {
 	resetDB(t)
 	clearMigrationFolder(t)
 
-	// add our first migration
-	writeMigration(t, "001_this_is_a_migration.up.sql", `
+	writeMigration(t, "001_a_migration.up.sql", `
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
 	`)
 
-	writeMigration(t, "001_this_is_a_migration.down.sql", `DROP TABLE foos;`)
+	writeMigration(t, "001_a_migration.down.sql", `DROP TABLE foos;`)
 
 	err := Migrate(globalConfig())
 	if err != nil {
@@ -436,15 +435,21 @@ func TestRollbackFailed(t *testing.T) {
 	resetDB(t)
 	clearMigrationFolder(t)
 
-	// add our first migration
-	writeMigration(t, "001_this_is_a_migration.up.sql", `
+	writeMigration(t, "001_a_migration.up.sql", `
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
 	`)
 
-	writeMigration(t, "001_this_is_a_migration.down.sql", `DROP TABLE foos;`)
+	// Note the syntax error in the SQL
+	writeMigration(t, "001_a_migration.down.sql", `DRO TABLE foos;`)
 
-	err := Rollback(globalConfig())
+	err := Migrate(globalConfig())
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Migrations failed to run.")
+	}
+
+	err = Rollback(globalConfig())
 	if err == nil {
 		t.Fatal("Rollback succeeded when it shouldn't have.")
 	}

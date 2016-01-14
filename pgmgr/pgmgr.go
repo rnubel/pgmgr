@@ -25,6 +25,11 @@ const (
 
 const datetimeFormat = "20060102130405"
 
+const (
+	MIGRATION = "migration"
+	ROLLBACK  = "rollback"
+)
+
 // Migration stores a single migration's version and filename.
 type Migration struct {
 	Filename string
@@ -107,7 +112,7 @@ func Migrate(c *Config) error {
 			t0 := time.Now()
 
 			if err = applyMigration(c, m, UP); err != nil { // halt the migration process and return the error.
-				printFailedMigrationMessage(err)
+				printFailedMigrationMessage(err, MIGRATION)
 				return err
 			}
 
@@ -148,7 +153,7 @@ func Rollback(c *Config) error {
 	t0 := time.Now()
 
 	if err = applyMigration(c, *toRollback, DOWN); err != nil {
-		printFailedMigrationMessage(err)
+		printFailedMigrationMessage(err, ROLLBACK)
 		return err
 	}
 
@@ -472,8 +477,8 @@ func shRead(command string, args []string) (*[]byte, error) {
 	return &output, err
 }
 
-func printFailedMigrationMessage(err error) {
+func printFailedMigrationMessage(err error, migration_type string) {
 	fmt.Fprintf(os.Stderr, err.Error())
 	fmt.Fprintf(os.Stderr, "\n\n")
-	fmt.Fprintf(os.Stderr, "ERROR! Aborting the migration process.")
+	fmt.Fprintf(os.Stderr, "ERROR! Aborting the "+migration_type+" process.")
 }
