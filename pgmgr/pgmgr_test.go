@@ -405,6 +405,56 @@ func TestCreateMigration(t *testing.T) {
 	assertFileExists(fmt.Sprint(expectedStringVersion, "_create_index.no_txn.down.sql"))
 }
 
+func TestRollback(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+
+	writeMigration(t, "001_a_migration.up.sql", `
+		CREATE TABLE foos (foo_id INTEGER);
+		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
+	`)
+
+	writeMigration(t, "001_a_migration.down.sql", `DROP TABLE foos;`)
+
+	err := Migrate(globalConfig())
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Migrations failed to run.")
+	}
+
+	err = Rollback(globalConfig())
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Failed to rollback.")
+	}
+
+	psqlMustNotExec(t, "SELECT * FROM bars;")
+}
+
+func TestRollbackFailed(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+
+	writeMigration(t, "001_a_migration.up.sql", `
+		CREATE TABLE foos (foo_id INTEGER);
+		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
+	`)
+
+	// Note the syntax error in the SQL
+	writeMigration(t, "001_a_migration.down.sql", `DRO TABLE foos;`)
+
+	err := Migrate(globalConfig())
+	if err != nil {
+		t.Log(err)
+		t.Fatal("Migrations failed to run.")
+	}
+
+	err = Rollback(globalConfig())
+	if err == nil {
+		t.Fatal("Rollback succeeded when it shouldn't have.")
+	}
+}
+
 // redundant, but I'm also lazy
 func testSh(t *testing.T, command string, args []string) error {
 	c := exec.Command(command, args...)
