@@ -107,9 +107,7 @@ func Migrate(c *Config) error {
 			t0 := time.Now()
 
 			if err = applyMigration(c, m, UP); err != nil { // halt the migration process and return the error.
-				fmt.Println(err)
-				fmt.Println("")
-				fmt.Println("ERROR! Aborting the migration process.")
+				printFailedMigrationMessage(err)
 				return err
 			}
 
@@ -150,6 +148,7 @@ func Rollback(c *Config) error {
 	t0 := time.Now()
 
 	if err = applyMigration(c, *toRollback, DOWN); err != nil {
+		printFailedMigrationMessage(err)
 		return err
 	}
 
@@ -471,4 +470,10 @@ func shRead(command string, args []string) (*[]byte, error) {
 	c := exec.Command(command, args...)
 	output, err := c.CombinedOutput()
 	return &output, err
+}
+
+func printFailedMigrationMessage(err error) {
+	fmt.Fprintf(os.Stderr, err.Error())
+	fmt.Fprintf(os.Stderr, "\n\n")
+	fmt.Fprintf(os.Stderr, "ERROR! Aborting the migration process.")
 }
