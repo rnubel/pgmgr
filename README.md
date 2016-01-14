@@ -119,6 +119,7 @@ pgmgr migration MigrationName   # generates files for a new migration
 pgmgr db create                 # creates the database if it doesn't exist
 pgmgr db drop                   # drop the database
 pgmgr db migrate                # apply un-applied migrations
+pgmgr db rollback               # reverts the latest migration, if possible.
 pgmgr db load                   # loads the schema dump file from PGMGR_DUMP_FILE
 pgmgr db dump                   # dumps the database structure & seeds to PGMGR_DUMP_FILE
 ```
