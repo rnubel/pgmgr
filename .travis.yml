@@ -6,7 +6,7 @@ go:
   - tip
 
 script:
-  - go get -u github.com/golang/lint/golint
+  - '[[ $(go version) =~ "1.4" ]] || go get -u github.com/golang/lint/golint'
   - test -z "$(gofmt -l .)"
-  - test -z "$(golint ./...)"
+  - '[[ $(go version) =~ "1.4" ]] || test -z "$(golint ./...)"'
   - go test -v ./...
