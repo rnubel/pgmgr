@@ -135,7 +135,7 @@ func main() {
 				if len(c.Args()) == 0 {
 					println("migration name not given! try `pgmgr migration NameGoesHere`")
 				} else {
-					pgmgr.CreateMigration(config, c.Args()[0], c.Bool("no-txn"))
+					displayErrorOrMessage(pgmgr.CreateMigration(config, c.Args()[0], c.Bool("no-txn")))
 				}
 			},
 		},
