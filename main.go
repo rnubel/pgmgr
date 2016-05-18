@@ -8,22 +8,22 @@ import (
 	"github.com/rnubel/pgmgr/pgmgr"
 )
 
-func displayErrorOrMessage(err error, args ...interface{}) {
+func displayErrorOrMessage(err error, args ...interface{}) error {
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: ", err)
-		os.Exit(1)
-	} else {
-		fmt.Println(args...)
+		return cli.NewExitError(fmt.Sprintln("Error: ", err), 1)
 	}
+
+	fmt.Println(args...)
+	return nil
 }
 
-func displayVersion(config *pgmgr.Config) {
+func displayVersion(config *pgmgr.Config) error {
 	v, err := pgmgr.Version(config)
 	if v < 0 {
-		displayErrorOrMessage(err, "Database has no schema_migrations table; run `pgmgr db migrate` to create it.")
-	} else {
-		displayErrorOrMessage(err, "Latest migration version:", v)
+		return displayErrorOrMessage(err, "Database has no schema_migrations table; run `pgmgr db migrate` to create it.")
 	}
+
+	return displayErrorOrMessage(err, "Latest migration version:", v)
 }
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 
 	app.Name = "pgmgr"
 	app.Usage = "manage your app's Postgres database"
-	app.Version = "0.0.1"
+	app.Version = "0.0.2"
 
 	var s []string
 
@@ -131,19 +131,20 @@ func main() {
 					Usage: "generate a migration that will not be wrapped in a transaction when run",
 				},
 			},
-			Action: func(c *cli.Context) {
+			Action: func(c *cli.Context) error {
 				if len(c.Args()) == 0 {
-					println("migration name not given! try `pgmgr migration NameGoesHere`")
-				} else {
-					displayErrorOrMessage(pgmgr.CreateMigration(config, c.Args()[0], c.Bool("no-txn")))
+					return cli.NewExitError("migration name not given! try `pgmgr migration NameGoesHere`", 1)
 				}
+
+				return displayErrorOrMessage(pgmgr.CreateMigration(config, c.Args()[0], c.Bool("no-txn")))
 			},
 		},
 		{
 			Name:  "config",
 			Usage: "displays the current configuration as seen by pgmgr",
-			Action: func(c *cli.Context) {
+			Action: func(c *cli.Context) error {
 				fmt.Printf("%+v\n", config)
+				return nil
 			},
 		},
 		{
@@ -153,65 +154,72 @@ func main() {
 				{
 					Name:  "create",
 					Usage: "creates the database if it doesn't exist",
-					Action: func(c *cli.Context) {
-						displayErrorOrMessage(pgmgr.Create(config), "Database", config.Database, "created successfully.")
+					Action: func(c *cli.Context) error {
+						return displayErrorOrMessage(pgmgr.Create(config), "Database", config.Database, "created successfully.")
 					},
 				},
 				{
 					Name:  "drop",
 					Usage: "drops the database (all sessions must be disconnected first. this command does not force it)",
-					Action: func(c *cli.Context) {
-						displayErrorOrMessage(pgmgr.Drop(config), "Database", config.Database, "dropped successfully.")
+					Action: func(c *cli.Context) error {
+						return displayErrorOrMessage(pgmgr.Drop(config), "Database", config.Database, "dropped successfully.")
 					},
 				},
 				{
 					Name:  "dump",
 					Usage: "dumps the database schema and contents to the dump file (see --dump-file)",
-					Action: func(c *cli.Context) {
+					Action: func(c *cli.Context) error {
 						err := pgmgr.Dump(config)
-						displayErrorOrMessage(err, "Database dumped to", config.DumpFile, "successfully")
+						return displayErrorOrMessage(err, "Database dumped to", config.DumpFile, "successfully")
 					},
 				},
 				{
 					Name:  "load",
 					Usage: "loads the database schema and contents from the dump file (see --dump-file)",
-					Action: func(c *cli.Context) {
+					Action: func(c *cli.Context) error {
 						err := pgmgr.Load(config)
-						displayErrorOrMessage(err, "Database loaded successfully.")
-						displayVersion(config)
+						err = displayErrorOrMessage(err, "Database loaded successfully.")
+						if err != nil {
+							return err
+						}
+
+						return displayVersion(config)
 					},
 				},
 				{
 					Name:  "version",
 					Usage: "returns the current schema version",
-					Action: func(c *cli.Context) {
-						displayVersion(config)
+					Action: func(c *cli.Context) error {
+						return displayVersion(config)
 					},
 				},
 				{
 					Name:  "migrate",
 					Usage: "applies any un-applied migrations in the migration folder (see --migration-folder)",
-					Action: func(c *cli.Context) {
+					Action: func(c *cli.Context) error {
 						err := pgmgr.Migrate(config)
 						if err != nil {
-							fmt.Fprintln(os.Stderr, "Error during migration:", err)
-							os.Exit(1)
+							return cli.NewExitError(fmt.Sprintln("Error during migration:", err), 1)
 						}
+
+						return nil
 					},
 				},
 				{
 					Name:  "rollback",
 					Usage: "rolls back the latest migration",
-					Action: func(c *cli.Context) {
+					Action: func(c *cli.Context) error {
 						pgmgr.Rollback(config)
+						return nil
 					},
 				},
 			},
 		},
 	}
 
-	app.Action = func(c *cli.Context) {
+	app.Action = func(c *cli.Context) error {
 		app.Command("help").Run(c)
+		return nil
 	}
 
 	app.Run(os.Args)
