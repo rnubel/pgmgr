@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/codegangsta/cli"
 	"github.com/rnubel/pgmgr/pgmgr"
+	"github.com/urfave/cli"
 )
 
 func displayErrorOrMessage(err error, args ...interface{}) error {
