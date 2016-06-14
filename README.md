@@ -62,6 +62,7 @@ variable `PGMGR_CONFIG_FILE`. It should look something like:
   "username": "test",
   "password": "test",
   "database": "testdb",
+  "sslmode": "disable",
   "migration-table": "public.schema_migrations",
   "migration-folder": "db/migrate",
   "dump-file": "db/dump.sql",
@@ -96,6 +97,7 @@ The values above map to these environment variables:
 * `PGMGR_USERNAME`
 * `PGMGR_PASSWORD`
 * `PGMGR_DATABASE`
+* `PGMGR_SSLMODE`
 * `PGMGR_DUMP_FILE` (the filepath to dump the database definition out to)
 * `PGMGR_SEED_TABLES` (tables to include data with when dumping the database)
 * `PGMGR_COLUMN_TYPE`
@@ -105,7 +107,7 @@ The values above map to these environment variables:
 If you prefer to use a connection string, you can set `PGMGR_URL` which will supersede the other configuration settings, e.g.:
 
 ```
-PGMGR_URL='postgres://test@localhost/testdb?sslmode=false&password=test'
+PGMGR_URL='postgres://test:test@localhost/testdb?sslmode=require'
 ```
 
 Also, for host, port, username, password, and database, if you haven't set a

@@ -46,6 +46,10 @@ func TestDefaults(t *testing.T) {
 	if c.Format != "unix" {
 		t.Fatal("config's format should default to unix, but was ", c.Format)
 	}
+
+	if c.SslMode != "disable" {
+		t.Fatal("config's sslmode should default to 'disable', but was ", c.SslMode)
+	}
 }
 
 func TestOverlays(t *testing.T) {
@@ -97,11 +101,11 @@ func TestOverlays(t *testing.T) {
 
 func TestURL(t *testing.T) {
 	c := &Config{}
-	c.URL = "postgres://foo@bar:5431/testdb"
+	c.URL = "postgres://foo@bar:5431/testdb?sslmode=verify-ca"
 
 	LoadConfig(c, &TestContext{})
 
-	if c.Username != "foo" || c.Host != "bar" || c.Port != 5431 || c.Database != "testdb" {
+	if c.Username != "foo" || c.Host != "bar" || c.Port != 5431 || c.Database != "testdb" || c.SslMode != "verify-ca" {
 		t.Fatal("config did not populate itself from the given URL:", c)
 	}
 }

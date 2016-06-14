@@ -74,6 +74,12 @@ func main() {
 			EnvVar: "PGMGR_PORT",
 		},
 		cli.StringFlag{
+			Name:   "sslmode",
+			Value:  "",
+			Usage:  "whether to verify SSL connection or not. See https://www.postgresql.org/docs/9.1/static/libpq-ssl.html",
+			EnvVar: "PGMGR_SSLMODE",
+		},
+		cli.StringFlag{
 			Name:   "url",
 			Value:  "",
 			Usage:  "connection URL or DSN containing connection info; will override the other params if given",
