@@ -439,7 +439,7 @@ func sqlConnectionString(c *Config) string {
 		" password='", c.Password, "'",
 		" host='", c.Host, "'",
 		" port=", c.Port,
-		" sslmode=", "disable")
+		" sslmode=", c.SslMode)
 }
 
 func migrations(c *Config, direction string) ([]Migration, error) {

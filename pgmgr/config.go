@@ -30,6 +30,7 @@ type Config struct {
 	Host     string
 	Port     int
 	URL      string
+	SslMode  string
 
 	// filepaths
 	DumpFile        string `json:"dump-file"`
@@ -94,6 +95,9 @@ func (config *Config) populateFromPostgresVars() {
 	if os.Getenv("PGPORT") != "" {
 		config.Port, _ = strconv.Atoi(os.Getenv("PGPORT"))
 	}
+	if os.Getenv("PGSSLMODE") != "" {
+		config.SslMode = os.Getenv("PGSSLMODE")
+	}
 }
 
 func (config *Config) applyDefaults() {
@@ -111,6 +115,9 @@ func (config *Config) applyDefaults() {
 	}
 	if config.MigrationTable == "" {
 		config.MigrationTable = "schema_migrations"
+	}
+	if config.SslMode == "" {
+		config.SslMode = "disable"
 	}
 }
 
@@ -133,6 +140,9 @@ func (config *Config) applyArguments(ctx argumentContext) {
 	if ctx.String("url") != "" {
 		config.URL = ctx.String("url")
 	}
+	if ctx.String("sslmode") != "" {
+		config.SslMode = ctx.String("sslmode")
+	}
 	if ctx.String("dump-file") != "" {
 		config.DumpFile = ctx.String("dump-file")
 	}
@@ -154,6 +164,14 @@ func (config *Config) overrideFromURL() {
 		config.Host = m[2]
 		config.Port, _ = strconv.Atoi(m[3])
 		config.Database = m[4]
+
+		queryRegex := regexp.MustCompile("([a-zA-Z0-9_-]+)=([a-zA-Z0-9_-]+)")
+		matches := queryRegex.FindAllStringSubmatch(config.URL, -1)
+		for _, match := range matches {
+			if match[1] == "sslmode" {
+				config.SslMode = match[2]
+			}
+		}
 	} else {
 		println("Could not parse DSN:  ", config.URL, " using regex ", r.String())
 	}
