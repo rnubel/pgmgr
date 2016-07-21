@@ -157,7 +157,7 @@ func (config *Config) applyArguments(ctx argumentContext) {
 func (config *Config) overrideFromURL() {
 	// parse the DSN and populate the other configuration values. Some of the pg commands
 	// accept a DSN parameter, but not all, so this will help unify things.
-	r := regexp.MustCompile("^postgres://(.*)@(.*):([0-9]+)/([a-zA-Z0-9_-]+)")
+	r := regexp.MustCompile("^postgres://(.*)@(.*):([0-9]+)/([^?]+)")
 	m := r.FindStringSubmatch(config.URL)
 	if len(m) > 0 {
 		config.Username = m[1]

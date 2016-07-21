@@ -101,11 +101,11 @@ func TestOverlays(t *testing.T) {
 
 func TestURL(t *testing.T) {
 	c := &Config{}
-	c.URL = "postgres://foo@bar:5431/testdb?sslmode=verify-ca"
+	c.URL = "postgres://foo@bar:5431/test-db.one?sslmode=verify-ca"
 
 	LoadConfig(c, &TestContext{})
 
-	if c.Username != "foo" || c.Host != "bar" || c.Port != 5431 || c.Database != "testdb" || c.SslMode != "verify-ca" {
+	if c.Username != "foo" || c.Host != "bar" || c.Port != 5431 || c.Database != "test-db.one" || c.SslMode != "verify-ca" {
 		t.Fatal("config did not populate itself from the given URL:", c)
 	}
 }
