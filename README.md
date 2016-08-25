@@ -1,7 +1,7 @@
 # Postgres Manager (pgmgr)
 [![Build Status](https://travis-ci.org/rnubel/pgmgr.svg?branch=master)](https://travis-ci.org/rnubel/pgmgr)
 
-Utility for web applications to manage their Postgres application in a
+Utility for web applications to manage their Postgres database in a
 reliable, consistent manner. Inspired by [mattes/migrate]
 (http://www.github.com/mattes/migrate), but with several benefits:
 
