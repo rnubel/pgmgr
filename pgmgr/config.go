@@ -165,7 +165,7 @@ func (config *Config) overrideFromURL() {
 		config.Port, _ = strconv.Atoi(m[3])
 		config.Database = m[4]
 
-		ur := regexp.MustCompile("(.*):(.*)")
+		ur := regexp.MustCompile("^(.*):(.*)$")
 		um := ur.FindStringSubmatch(user)
 
 		if len(um) > 0 {
