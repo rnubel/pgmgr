@@ -160,10 +160,20 @@ func (config *Config) overrideFromURL() {
 	r := regexp.MustCompile("^postgres://(.*)@(.*):([0-9]+)/([^?]+)")
 	m := r.FindStringSubmatch(config.URL)
 	if len(m) > 0 {
-		config.Username = m[1]
+		user := m[1]
 		config.Host = m[2]
 		config.Port, _ = strconv.Atoi(m[3])
 		config.Database = m[4]
+
+		ur := regexp.MustCompile("(.*):(.*)")
+		um := ur.FindStringSubmatch(user)
+
+		if len(um) > 0 {
+			config.Username = um[1]
+			config.Password = um[2]
+		} else {
+			config.Username = user
+		}
 
 		queryRegex := regexp.MustCompile("([a-zA-Z0-9_-]+)=([a-zA-Z0-9_-]+)")
 		matches := queryRegex.FindAllStringSubmatch(config.URL, -1)
