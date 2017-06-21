@@ -433,13 +433,22 @@ func openConnection(c *Config) (*sql.DB, error) {
 }
 
 func sqlConnectionString(c *Config) string {
-	return fmt.Sprint(
-		" user='", c.Username, "'",
-		" dbname='", c.Database, "'",
-		" password='", c.Password, "'",
+	args := make([]interface{}, 0)
+
+	if c.Database != "" {
+		args = append(args, " dbname='", c.Database, "'")
+	}
+
+	if c.Password != "" {
+		args = append(args, " password='", c.Password, "'")
+	}
+
+	args = append(args,
 		" host='", c.Host, "'",
 		" port=", c.Port,
 		" sslmode=", c.SslMode)
+
+	return fmt.Sprint(args...)
 }
 
 func migrations(c *Config, direction string) ([]Migration, error) {
