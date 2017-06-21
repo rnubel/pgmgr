@@ -165,12 +165,12 @@ func (config *Config) overrideFromURL() {
 		config.Port, _ = strconv.Atoi(m[3])
 		config.Database = m[4]
 
-		ur := regexp.MustCompile("^(.*):(.*)$")
-		um := ur.FindStringSubmatch(user)
+		userRegex := regexp.MustCompile("^(.*):(.*)$")
+		userMatch := userRegex.FindStringSubmatch(user)
 
-		if len(um) > 0 {
-			config.Username = um[1]
-			config.Password = um[2]
+		if len(userMatch) > 0 {
+			config.Username = userMatch[1]
+			config.Password = userMatch[2]
 		} else {
 			config.Username = user
 		}
