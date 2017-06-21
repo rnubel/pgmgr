@@ -435,6 +435,10 @@ func openConnection(c *Config) (*sql.DB, error) {
 func sqlConnectionString(c *Config) string {
 	args := make([]interface{}, 0)
 
+	if c.Username != "" {
+		args = append(args, " user='", c.Username, "'")
+	}
+
 	if c.Database != "" {
 		args = append(args, " dbname='", c.Database, "'")
 	}
