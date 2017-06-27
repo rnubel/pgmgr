@@ -39,6 +39,7 @@ type Config struct {
 	// options
 	MigrationTable string   `json:"migration-table"`
 	SeedTables     []string `json:"seed-tables"`
+	UserRoles      []string `json:"user-roles"`
 	ColumnType     string   `json:"column-type"`
 	Format         string
 }
