@@ -95,24 +95,32 @@ func (m Migration) WrapInTransaction() bool {
 
 // Create creates the database specified by the configuration.
 func Create(c *Config) error {
-	return sh("createdb", []string{c.Database})
+	return sh("createdb", []string{c.Database}, c.Password)
 }
 
 // Drop drops the database specified by the configuration.
 func Drop(c *Config) error {
-	return sh("dropdb", []string{c.Database})
+	return sh("dropdb", []string{c.Database}, c.Password)
 }
 
 // Dump dumps the schema and contents of the database to the dump file.
 func Dump(c *Config) error {
 	// dump schema first...
-	schema, err := shRead("pg_dump", []string{"--schema-only", c.Database})
+	args := []string{"--schema-only", "-h", c.Host, "-U", c.Username, "-p", strconv.Itoa(c.Port)}
+	for _, table := range c.ExcludedTables {
+		args = append(args, "--exclude-table", table)
+	}
+	for _, schema := range c.ExcludedSchemas {
+		args = append(args, "--exclude-schema", schema)
+	}
+	args = append(args, c.Database)
+	schema, err := shRead("pg_dump", args, c.Password)
 	if err != nil {
 		return err
 	}
 
 	// then selected data...
-	args := []string{c.Database, "--data-only", "--disable-triggers"}
+	args = []string{c.Database, "--data-only", "--disable-triggers", "-h", c.Host, "-U", c.Username, "-p", strconv.Itoa(c.Port)}
 	if len(c.SeedTables) > 0 {
 		for _, table := range c.SeedTables {
 			println("pulling data for", table)
@@ -121,7 +129,7 @@ func Dump(c *Config) error {
 	}
 	println(strings.Join(args, ""))
 
-	seeds, err := shRead("pg_dump", args)
+	seeds, err := shRead("pg_dump", args, c.Password)
 	if err != nil {
 		return err
 	}
@@ -177,7 +185,11 @@ func Dump(c *Config) error {
 
 // Load loads the database from the dump file using psql.
 func Load(c *Config) error {
-	return sh("psql", []string{"-d", c.Database, "-f", c.DumpFile})
+	if len(c.Superuser) > 0 {
+		return sh("psql", []string{"-d", c.Database, "-f", c.DumpFile, "-U", c.Superuser}, c.Password)
+	}
+
+	return sh("psql", []string{"-d", c.Database, "-f", c.DumpFile}, c.Password)
 }
 
 // Migrate applies un-applied migrations in the specified MigrationFolder.
@@ -304,7 +316,7 @@ func dumpSettings(c *Config) (*[]byte, error) {
 			if match := regexp.MustCompile(`=$`).FindStringSubmatchIndex(setting); len(match) > 0 {
 				setting += "''"
 			}
-			buffer.WriteString(fmt.Sprintf("ALTER DATABASE :DBNAME SET %s;", setting))
+			buffer.WriteString(fmt.Sprintf("ALTER DATABASE :DBNAME SET %s;\n", setting))
 		}
 	}
 
@@ -326,25 +338,25 @@ func dumpRolesAndMemberships(c *Config, roles map[string]string) (*[]byte, error
 		return nil, err
 	}
 
-	var roles_to_dump []string
-	var oids_to_avoid []string
+	var rolesToDump []string
+	var oidsToAvoid []string
 
 	for role, oid := range roles {
 		if oid == "-1" {
-			roles_to_dump = append(roles_to_dump, role)
+			rolesToDump = append(rolesToDump, role)
 		} else {
-			oids_to_avoid = append(oids_to_avoid, oid)
+			oidsToAvoid = append(oidsToAvoid, oid)
 		}
 	}
 
-	rows, err := db.Query(
-		`WITH RECURSIVE memberships(roleid, member, admin_option, grantor) AS (
+	sqel := fmt.Sprintf(`
+		WITH RECURSIVE memberships(roleid, member, admin_option, grantor) AS (
 				SELECT ur.oid AS roleid,
 							 NULL::oid AS member,
 							 NULL::boolean AS admin_option,
 							 NULL::oid AS grantor
 				FROM pg_roles ur
-				WHERE ur.rolname = ANY($1::TEXT[])
+				WHERE ur.rolname = ANY('{%s}'::TEXT[])
 				UNION
 				SELECT COALESCE(a.roleid, r.oid) AS roleid,
 							 a.member AS member,
@@ -355,7 +367,7 @@ func dumpRolesAndMemberships(c *Config, roles map[string]string) (*[]byte, error
 				JOIN memberships
 					ON (memberships.roleid = a.member)
 					OR (memberships.roleid = r.oid OR memberships.member = r.oid)
-					OR (memberships.roleid = a.roleid AND COALESCE(memberships.member, 0::oid) <> a.member AND a.member <> ANY($2::OID[]))
+					OR (memberships.roleid = a.roleid AND COALESCE(memberships.member, 0::oid) <> a.member AND a.member <> ALL('{%s}'::OID[]))
 			)
 			SELECT DISTINCT ON(ur.rolname, um.rolname)
 						 ur.rolname AS roleid,
@@ -376,7 +388,9 @@ func dumpRolesAndMemberships(c *Config, roles map[string]string) (*[]byte, error
 			LEFT JOIN pg_roles ur on ur.oid = memberships.roleid
 			LEFT JOIN pg_roles um on um.oid = memberships.member
 			LEFT JOIN pg_roles ug on ug.oid = memberships.grantor
-			ORDER BY 1,2 NULLS LAST`, "{"+strings.Join(roles_to_dump, ",")+"}", "{"+strings.Join(oids_to_avoid, ",")+"}")
+			ORDER BY 1,2 NULLS LAST`, strings.Join(rolesToDump, ","), strings.Join(oidsToAvoid, ","))
+
+	rows, err := db.Query(sqel)
 
 	if err != nil {
 		return nil, err
@@ -423,42 +437,42 @@ func dumpRolesAndMemberships(c *Config, roles map[string]string) (*[]byte, error
 				if r.rolsuper.Bool == true {
 					buffer.WriteString("SUPERUSER ")
 				} else {
-					buffer.WriteString("NO SUPERUSER ")
+					buffer.WriteString("NOSUPERUSER ")
 				}
 			}
 			if r.rolinherit.Valid {
 				if r.rolinherit.Bool == true {
 					buffer.WriteString("INHERIT ")
 				} else {
-					buffer.WriteString("NO INHERIT ")
+					buffer.WriteString("NOINHERIT ")
 				}
 			}
 			if r.rolcreaterole.Valid {
 				if r.rolcreaterole.Bool == true {
 					buffer.WriteString("CREATEROLE ")
 				} else {
-					buffer.WriteString("NO CREATEROLE ")
+					buffer.WriteString("NOCREATEROLE ")
 				}
 			}
 			if r.rolcreatedb.Valid {
 				if r.rolcreatedb.Bool == true {
 					buffer.WriteString("CREATEDB ")
 				} else {
-					buffer.WriteString("NO CREATEDB ")
+					buffer.WriteString("NOCREATEDB ")
 				}
 			}
 			if r.rolcanlogin.Valid {
 				if r.rolcanlogin.Bool == true {
 					buffer.WriteString("LOGIN ")
 				} else {
-					buffer.WriteString("NO LOGIN ")
+					buffer.WriteString("NOLOGIN ")
 				}
 			}
 			if r.rolreplication.Valid {
 				if r.rolreplication.Bool == true {
 					buffer.WriteString("REPLICATION ")
 				} else {
-					buffer.WriteString("NO REPLICATION ")
+					buffer.WriteString("NOREPLICATION ")
 				}
 			}
 			if r.rolconnlimit.Valid {
@@ -487,8 +501,9 @@ func dumpRolesAndMemberships(c *Config, roles map[string]string) (*[]byte, error
 					if r.adminOption.Valid {
 						buffer.WriteString("WITH ADMIN OPTION ")
 					}
-					buffer.WriteString(fmt.Sprintf(`GRANTED BY "%s");\n`, r.grantor.String))
+					buffer.WriteString(fmt.Sprintf(`GRANTED BY "%s"$$);`, r.grantor.String))
 				}
+				buffer.WriteString("\n")
 			}
 		}
 	}
@@ -508,23 +523,24 @@ func markUserRoles(c *Config, roles map[string]string) error {
 		return err
 	}
 
-	usersFromAcl := make([]string, len(roles))
+	usersFromACL := make([]string, len(roles))
 	i := 0
-	for role, _ := range roles {
-		usersFromAcl[i] = role
+	for role := range roles {
+		usersFromACL[i] = role
 		i++
 	}
 
 	for _, role := range c.UserRoles {
-		usersFromAcl = append(usersFromAcl, role)
+		usersFromACL = append(usersFromACL, role)
 	}
 
-	rows, err := db.Query(
-		`SELECT oid, rolname
+	sql := fmt.Sprintf(`SELECT oid, rolname
 		FROM pg_roles
 		WHERE rolcanlogin
 		AND NOT rolsuper
-		AND rolname <> ANY($1::TEXT[])`, "{"+strings.Join(usersFromAcl, ",")+"}") //not necessary to quote
+		AND rolname <> ANY('{%s}'::TEXT[])`, strings.Join(usersFromACL, ","))
+	rows, err := db.Query(sql)
+
 	if err != nil {
 		return err
 	}
@@ -672,6 +688,13 @@ func applyMigration(c *Config, m Migration, direction int) error {
 	contents, err := ioutil.ReadFile(filepath.Join(c.MigrationFolder, m.Filename))
 	if err != nil {
 		return err
+	}
+
+	// rewrite Config (only locally) if explicit migration user is provided
+	if len(c.MigrationUser) > 0 {
+		newConfig := *c
+		newConfig.Username = newConfig.MigrationUser
+		c = &newConfig
 	}
 
 	db, err := openConnection(c)
@@ -842,7 +865,8 @@ func migrations(c *Config, direction string) ([]Migration, error) {
 	return migrations, nil
 }
 
-func sh(command string, args []string) error {
+func sh(command string, args []string, password string) error {
+	os.Setenv("PGPASSWORD", password)
 	c := exec.Command(command, args...)
 	output, err := c.CombinedOutput()
 	fmt.Println(string(output))
@@ -853,7 +877,8 @@ func sh(command string, args []string) error {
 	return nil
 }
 
-func shRead(command string, args []string) (*[]byte, error) {
+func shRead(command string, args []string, password string) (*[]byte, error) {
+	os.Setenv("PGPASSWORD", password)
 	c := exec.Command(command, args...)
 	output, err := c.CombinedOutput()
 	return &output, err

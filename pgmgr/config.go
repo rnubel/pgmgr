@@ -24,24 +24,28 @@ type argumentContext interface {
 // Config stores the options used by pgmgr.
 type Config struct {
 	// connection
-	Username string
-	Password string
-	Database string
-	Host     string
-	Port     int
-	URL      string
-	SslMode  string
+	Username      string
+	Superuser     string
+	MigrationUser string `json:"migration-user"`
+	Password      string
+	Database      string
+	Host          string
+	Port          int
+	URL           string
+	SslMode       string
 
 	// filepaths
 	DumpFile        string `json:"dump-file"`
 	MigrationFolder string `json:"migration-folder"`
 
 	// options
-	MigrationTable string   `json:"migration-table"`
-	SeedTables     []string `json:"seed-tables"`
-	UserRoles      []string `json:"user-roles"`
-	ColumnType     string   `json:"column-type"`
-	Format         string
+	MigrationTable  string   `json:"migration-table"`
+	SeedTables      []string `json:"seed-tables"`
+	ExcludedTables  []string `json:"excluded-tables"`
+	ExcludedSchemas []string `json:"excluded-schemas"`
+	UserRoles       []string `json:"user-roles"`
+	ColumnType      string   `json:"column-type"`
+	Format          string
 }
 
 // LoadConfig reads the config file, applies CLI arguments as
