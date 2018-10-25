@@ -8,7 +8,7 @@ go:
   - tip
 
 script:
-  - '[[ $(go version) =~ 1.[45] ]] || go get -u github.com/golang/lint/golint'
+  - '[[ $(go version) =~ 1.[45] ]] || go get -u golang.org/x/lint/golint'
   - test -z "$(gofmt -l .)"
   - '[[ $(go version) =~ 1.[45] ]] || test -z "$(golint ./...)"'
   - go test -v ./...
