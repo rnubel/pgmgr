@@ -45,16 +45,28 @@ func (m Migration) WrapInTransaction() bool {
 
 // Create creates the database specified by the configuration.
 func Create(c *Config) error {
+	if err := c.DumpToEnv(); err != nil {
+		return err
+	}
+
 	return sh("createdb", []string{c.Database})
 }
 
 // Drop drops the database specified by the configuration.
 func Drop(c *Config) error {
+	if err := c.DumpToEnv(); err != nil {
+		return err
+	}
+
 	return sh("dropdb", []string{c.Database})
 }
 
 // Dump dumps the schema and contents of the database to the dump file.
 func Dump(c *Config) error {
+	if err := c.DumpToEnv(); err != nil {
+		return err
+	}
+
 	// dump schema first...
 	schema, err := shRead("pg_dump", []string{"--schema-only", c.Database})
 	if err != nil {
@@ -91,6 +103,10 @@ func Dump(c *Config) error {
 
 // Load loads the database from the dump file using psql.
 func Load(c *Config) error {
+	if err := c.DumpToEnv(); err != nil {
+		return err
+	}
+
 	return sh("psql", []string{"-d", c.Database, "-f", c.DumpFile})
 }
 
@@ -279,6 +295,56 @@ type execer interface {
 }
 
 func applyMigration(c *Config, m Migration, direction int) error {
+	if c.MigrationDriver == "psql" {
+		return applyMigrationByPsql(c, m, direction)
+	}
+
+	return applyMigrationByPq(c, m, direction)
+}
+
+func applyMigrationByPsql(c *Config, m Migration, direction int) error {
+	if err := c.DumpToEnv(); err != nil {
+		return err
+	}
+
+	contents, err := ioutil.ReadFile(filepath.Join(c.MigrationFolder, m.Filename))
+	if err != nil {
+		return err
+	}
+
+	tmpfile, err := ioutil.TempFile("", "migration")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmpfile.Name()) // clean up
+
+	if _, err := tmpfile.Write(contents); err != nil {
+		return err
+	}
+
+	tmpfile.WriteString(
+		fmt.Sprintf(`INSERT INTO %s (version) VALUES ('%d');`, c.quotedMigrationTable(), m.Version),
+	)
+
+	if err := tmpfile.Close(); err != nil {
+		return err
+	}
+
+	migrationFilePath := tmpfile.Name()
+	args := []string{"-f", migrationFilePath, "-v", "ON_ERROR_STOP=1"}
+
+	if m.WrapInTransaction() {
+		args = append(args, "-1")
+	}
+
+	if err := sh("psql", args); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func applyMigrationByPq(c *Config, m Migration, direction int) error {
 	var tx *sql.Tx
 	var exec execer
 

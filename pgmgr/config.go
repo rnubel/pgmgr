@@ -37,10 +37,11 @@ type Config struct {
 	MigrationFolder string `json:"migration-folder"`
 
 	// options
-	MigrationTable string   `json:"migration-table"`
-	SeedTables     []string `json:"seed-tables"`
-	ColumnType     string   `json:"column-type"`
-	Format         string
+	MigrationTable  string   `json:"migration-table"`
+	MigrationDriver string   `json:"migration-driver"`
+	SeedTables      []string `json:"seed-tables"`
+	ColumnType      string   `json:"column-type"`
+	Format          string
 }
 
 // LoadConfig reads the config file, applies CLI arguments as
@@ -100,6 +101,31 @@ func (config *Config) populateFromPostgresVars() {
 	}
 }
 
+// DumpToEnv applies all applicable keys as PG environment variables, so that
+// shell commands will work on the correct target.
+func (config *Config) DumpToEnv() error {
+	if err := os.Setenv("PGUSER", config.Username); err != nil {
+		return err
+	}
+	if err := os.Setenv("PGPASSWORD", config.Password); err != nil {
+		return err
+	}
+	if err := os.Setenv("PGDATABASE", config.Database); err != nil {
+		return err
+	}
+	if err := os.Setenv("PGHOST", config.Host); err != nil {
+		return err
+	}
+	if err := os.Setenv("PGPORT", fmt.Sprint(config.Port)); err != nil {
+		return err
+	}
+	if err := os.Setenv("PGSSLMODE", config.SslMode); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (config *Config) applyDefaults() {
 	if config.Port == 0 {
 		config.Port = 5432
@@ -115,6 +141,9 @@ func (config *Config) applyDefaults() {
 	}
 	if config.MigrationTable == "" {
 		config.MigrationTable = "schema_migrations"
+	}
+	if config.MigrationDriver == "" {
+		config.MigrationDriver = "pq"
 	}
 	if config.SslMode == "" {
 		config.SslMode = "disable"
@@ -148,6 +177,9 @@ func (config *Config) applyArguments(ctx argumentContext) {
 	}
 	if ctx.String("migration-folder") != "" {
 		config.MigrationFolder = ctx.String("migration-folder")
+	}
+	if ctx.String("migration-driver") != "" {
+		config.MigrationDriver = ctx.String("migration-driver")
 	}
 	if ctx.StringSlice("seed-tables") != nil && len(ctx.StringSlice("seed-tables")) > 0 {
 		config.SeedTables = ctx.StringSlice("seed-tables")
@@ -198,6 +230,10 @@ func (config *Config) validate() error {
 
 	if config.Format == "datetime" && config.ColumnType != "string" {
 		return errors.New(`ColumnType must be "string" if Format is "datetime"`)
+	}
+
+	if config.MigrationDriver != "pq" && config.MigrationDriver != "psql" {
+		return errors.New("MigrationDriver must be one of: pq, psql")
 	}
 
 	return nil
