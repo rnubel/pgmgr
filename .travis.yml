@@ -1,15 +1,21 @@
 language: go
 
 go:
-  - 1.4
-  - 1.5
-  - 1.6
-  - 1.7
-  - tip
+  - '1.10'
+  - '1.11'
+  - stable
+  - master
+
+addons:
+  postgresql: "10"
+
+matrix:
+  allow_failures:
+    - go: master
 
 script:
-  - '[[ $(go version) =~ 1.[45] ]] || go get -u github.com/golang/lint/golint'
+  - go get -u golang.org/x/lint/golint
+  - test -z "$(golint ./...)"
   - test -z "$(gofmt -l .)"
-  - '[[ $(go version) =~ 1.[45] ]] || test -z "$(golint ./...)"'
   - createuser pgmgr -s
   - go test -v ./...

@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/rnubel/pgmgr/pgmgr"
-	"github.com/urfave/cli"
+	cli "gopkg.in/urfave/cli.v1"
 )
 
 func displayErrorOrMessage(err error, args ...interface{}) error {
