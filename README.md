@@ -88,6 +88,11 @@ schema unless the database's default search path has been modified. If you
 use a schema qualified name, pgmgr will attempt to create the schema first
 if it does not yet exist.
 
+`migration-driver`, added in August 2019, allows migrations to be run either
+through the Go `pq` library (which runs the migrations as a single multi-statement
+command) or through the `psql` command-line utility. The possible options are
+`'pq'` or `'psql'`. The default is currently `pq` (subject to change).
+
 ### Environment variables
 
 The values above map to these environment variables:
@@ -103,6 +108,7 @@ The values above map to these environment variables:
 * `PGMGR_COLUMN_TYPE`
 * `PGMGR_FORMAT`
 * `PGMGR_MIGRATION_TABLE`
+* `PGMGR_MIGRATION_DRIVER`
 
 If you prefer to use a connection string, you can set `PGMGR_URL` which will supersede the other configuration settings, e.g.:
 

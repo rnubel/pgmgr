@@ -19,6 +19,7 @@ const (
 
 func globalConfig() *Config {
 	return &Config{
+		Username:        "pgmgr",
 		Database:        testDBName,
 		Host:            "localhost",
 		Port:            5432,
@@ -79,7 +80,8 @@ func TestDump(t *testing.T) {
 		t.Fatal("Could not read dump")
 	}
 
-	if !strings.Contains(string(file), "CREATE TABLE bars") {
+	if !(strings.Contains(string(file), "CREATE TABLE bars") || strings.Contains(string(file), "CREATE TABLE public.bars")) {
+		t.Log(string(file))
 		t.Fatal("dump does not contain the table definition")
 	}
 
@@ -364,6 +366,55 @@ func TestMigrateCustomMigrationTable(t *testing.T) {
 
 	if v != 1 {
 		t.Fatal("Expected version 1, got ", v)
+	}
+}
+
+func TestMigratePsqlDriver(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+
+	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER, val BOOLEAN);`)
+	writeMigration(t, "002_index_foos.no_txn.up.sql", `CREATE INDEX CONCURRENTLY ON foos (foo_id); CREATE INDEX CONCURRENTLY ON foos (val);`)
+
+	config := globalConfig()
+	config.MigrationDriver = "psql"
+
+	if err := Migrate(config); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != 2 {
+		t.Fatal("Expected version 2, got ", v)
+	}
+
+	if err := psqlExec(t, `SELECT * FROM foos;`); err != nil {
+		t.Fatal("Foos table is not queryable -- does it exist?")
+	}
+}
+
+func TestMigratePsqlFailedMigration(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+
+	writeMigration(t, "001_oops.up.sql", `
+		CREATE TABLE bars (bar_id INTEGER);
+		CREATE TABLE foos (foo_id INTEGER, val BOOLEAN;
+	`) // syntax error!
+
+	config := globalConfig()
+	config.MigrationDriver = "psql"
+
+	if err := Migrate(config); err == nil {
+		t.Fatal("Expected malformed migration to raise error, but got none")
+	}
+
+	if err := psqlExec(t, `SELECT * FROM bars;`); err == nil {
+		t.Fatal("Migration partially applied when it should've rolled back")
 	}
 }
 

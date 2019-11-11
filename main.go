@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/rnubel/pgmgr/pgmgr"
-	"github.com/urfave/cli"
+	cli "gopkg.in/urfave/cli.v1"
 )
 
 func displayErrorOrMessage(err error, args ...interface{}) error {
@@ -114,6 +114,12 @@ func main() {
 			Value:  "",
 			Usage:  "folder containing the migrations to apply",
 			EnvVar: "PGMGR_MIGRATION_FOLDER",
+		},
+		cli.StringFlag{
+			Name:   "migration-driver",
+			Value:  "",
+			Usage:  "how to apply the migrations. supported options are pq (which will execute the migration as one statement) or psql (which will use the psql binary on your system to execute each line)",
+			EnvVar: "PGMGR_MIGRATION_DRIVER",
 		},
 		cli.StringSliceFlag{
 			Name:   "seed-tables",
