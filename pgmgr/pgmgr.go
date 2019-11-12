@@ -323,7 +323,7 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 	}
 
 	tmpfile.WriteString(
-		fmt.Sprintf(`INSERT INTO %s (version) VALUES ('%d');`, c.quotedMigrationTable(), m.Version),
+		fmt.Sprintf(`; INSERT INTO %s (version) VALUES ('%d');`, c.quotedMigrationTable(), m.Version),
 	)
 
 	if err := tmpfile.Close(); err != nil {
@@ -494,11 +494,12 @@ func migrationIsApplied(c *Config, version int64) (bool, error) {
 }
 
 func openConnection(c *Config) (*sql.DB, error) {
-	db, err := sql.Open("postgres", sqlConnectionString(c))
+	db, err := sql.Open("postgres", SQLConnectionString(c))
 	return db, err
 }
 
-func sqlConnectionString(c *Config) string {
+// SQLConnectionString formats the values pulled from the config into a connection string
+func SQLConnectionString(c *Config) string {
 	args := make([]interface{}, 0)
 
 	if c.Username != "" {

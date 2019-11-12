@@ -397,6 +397,29 @@ func TestMigratePsqlDriver(t *testing.T) {
 	}
 }
 
+func TestMigratePsqlAddsSemicolon(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+
+	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER, val BOOLEAN)`)
+
+	config := globalConfig()
+	config.MigrationDriver = "psql"
+
+	if err := Migrate(config); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != 1 {
+		t.Fatal("Expected migration to apply; did not -- version is still: ", v)
+	}
+}
+
 func TestMigratePsqlFailedMigration(t *testing.T) {
 	resetDB(t)
 	clearMigrationFolder(t)
