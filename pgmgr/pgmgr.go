@@ -494,11 +494,12 @@ func migrationIsApplied(c *Config, version int64) (bool, error) {
 }
 
 func openConnection(c *Config) (*sql.DB, error) {
-	db, err := sql.Open("postgres", sqlConnectionString(c))
+	db, err := sql.Open("postgres", SQLConnectionString(c))
 	return db, err
 }
 
-func sqlConnectionString(c *Config) string {
+// SQLConnectionString formats the values pulled from the config into a connection string
+func SQLConnectionString(c *Config) string {
 	args := make([]interface{}, 0)
 
 	if c.Username != "" {
