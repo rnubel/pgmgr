@@ -6,6 +6,9 @@ go:
   - stable
   - master
 
+env:
+  - GO111MODULE=1
+
 addons:
   postgresql: "10"
 
