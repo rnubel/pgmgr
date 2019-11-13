@@ -7,7 +7,8 @@ go:
   - master
 
 env:
-  - GO111MODULE=1
+  global:
+    - GO111MODULE=on
 
 addons:
   postgresql: "10"
