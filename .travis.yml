@@ -1,10 +1,13 @@
 language: go
 
 go:
-  - '1.11'
   - '1.12'
   - stable
   - master
+
+env:
+  global:
+    - GO111MODULE=on
 
 addons:
   postgresql: "10"
