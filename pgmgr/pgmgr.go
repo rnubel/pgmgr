@@ -322,9 +322,15 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 		return err
 	}
 
-	tmpfile.WriteString(
-		fmt.Sprintf(`; INSERT INTO %s (version) VALUES ('%d');`, c.quotedMigrationTable(), m.Version),
-	)
+	if direction == UP {
+		tmpfile.WriteString(
+			fmt.Sprintf(`; INSERT INTO %s (version) VALUES ('%d');`, c.quotedMigrationTable(), m.Version),
+		)
+	} else { // DOWN
+		tmpfile.WriteString(
+			fmt.Sprintf(`; DELETE FROM %s WHERE version = '%d';`, c.quotedMigrationTable(), m.Version),
+		)
+	}
 
 	if err := tmpfile.Close(); err != nil {
 		return err

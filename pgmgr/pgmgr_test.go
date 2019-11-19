@@ -374,7 +374,9 @@ func TestMigratePsqlDriver(t *testing.T) {
 	clearMigrationFolder(t)
 
 	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER, val BOOLEAN);`)
+	writeMigration(t, "001_create_foos.down.sql", `DROP TABLE foos;`)
 	writeMigration(t, "002_index_foos.no_txn.up.sql", `CREATE INDEX CONCURRENTLY ON foos (foo_id); CREATE INDEX CONCURRENTLY ON foos (val);`)
+	writeMigration(t, "002_index_foos.no_txn.down.sql", ``)
 
 	config := globalConfig()
 	config.MigrationDriver = "psql"
@@ -389,11 +391,33 @@ func TestMigratePsqlDriver(t *testing.T) {
 	}
 
 	if v != 2 {
-		t.Fatal("Expected version 2, got ", v)
+		t.Fatal("expected version 2, got ", v)
 	}
 
 	if err := psqlExec(t, `SELECT * FROM foos;`); err != nil {
-		t.Fatal("Foos table is not queryable -- does it exist?")
+		t.Fatal("foos table is not queryable -- does it exist?")
+	}
+
+	if err := Rollback(config); err != nil {
+		t.Fatal("rollback of 2 failed")
+	}
+
+	v, _ = Version(config)
+	if v != 1 {
+		t.Fatal("expected version 1, got ", v)
+	}
+
+	if err := Rollback(config); err != nil {
+		t.Fatal("rollback of 1 failed")
+	}
+
+	v, _ = Version(config)
+	if v != -1 {
+		t.Fatal("expected version -1, got ", v)
+	}
+
+	if err := psqlExec(t, `SELECT * FROM foos;`); err == nil {
+		t.Fatal("foos table is queryable but should not be")
 	}
 }
 
