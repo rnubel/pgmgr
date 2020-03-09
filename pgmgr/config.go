@@ -261,7 +261,7 @@ func (config *Config) applyArguments(ctx argumentContext) {
 		config.SslMode = ctx.String("sslmode")
 	}
 	if ctx.String("dump-file") != "" {
-		deprecatedDumpFieldWarning("dump-file")
+		deprecatedDumpFieldWarning("dump-file", "dump-file")
 		config.DumpFile = ctx.String("dump-file")
 	}
 	if ctx.String("migration-folder") != "" {
@@ -271,7 +271,7 @@ func (config *Config) applyArguments(ctx argumentContext) {
 		config.MigrationDriver = ctx.String("migration-driver")
 	}
 	if ctx.StringSlice("seed-tables") != nil && len(ctx.StringSlice("seed-tables")) > 0 {
-		deprecatedDumpFieldWarning("seed-tables")
+		deprecatedDumpFieldWarning("seed-tables", "include-tables")
 		config.SeedTables = ctx.StringSlice("seed-tables")
 	}
 }
@@ -346,9 +346,9 @@ func (config *Config) versionColumnType() string {
 	return "INTEGER"
 }
 
-func deprecatedDumpFieldWarning(field string) {
+func deprecatedDumpFieldWarning(oldField, newField string) {
 	fmt.Println(
-		"WARN: Using "+field+" as a top-level key in .pgmgr.json is deprecated.",
-		"Specify it in your config file underneath the 'dump-options' key.",
+		"WARN: Using '" + oldField + "' as a top-level key in .pgmgr.json is deprecated.",
+		"Specify it as '" + newField + "' in your config file underneath the 'dump-options' key.",
 	)
 }
