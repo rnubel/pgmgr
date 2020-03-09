@@ -182,7 +182,7 @@ func main() {
 					Usage: "dumps the database schema and contents to the dump file (see --dump-file)",
 					Action: func(c *cli.Context) error {
 						err := pgmgr.Dump(config)
-						return displayErrorOrMessage(err, "Database dumped to", config.DumpFile, "successfully")
+						return displayErrorOrMessage(err, "Database dumped to", config.DumpConfig.GetDumpFile(), "successfully")
 					},
 				},
 				{

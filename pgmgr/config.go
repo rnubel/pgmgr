@@ -21,6 +21,81 @@ type argumentContext interface {
 	StringSlice(string) []string
 }
 
+// DumpConfig stores the options used by pgmgr's dump tool
+// and defers connection-type options to the main config file
+type DumpConfig struct {
+	// exclusions
+	ExcludeSchemas []string `json:"exclude-schemas"`
+	ExcludeTables  []string `json:"exclude-tables"`
+	ExcludeData    []string `json:"exclude-data"`
+
+	// inclusions
+	IncludeSchemas []string `json:"include-schemas"`
+	IncludeTables  []string `json:"include-tables"`
+
+	// options
+	DumpFile string `json:"dump-file"`
+	Compress bool   `json:"compress"`
+}
+
+// GetDumpFileRaw returns the literal dump file name as configured
+func (d DumpConfig) GetDumpFileRaw() string {
+	return d.DumpFile
+}
+
+// GetDumpFile returns the true dump file name
+// with or without the specified compression suffix
+func (d DumpConfig) GetDumpFile() string {
+	if d.Compress {
+		return d.DumpFile + ".gz"
+	}
+	return d.DumpFile
+}
+
+// IsCompressed returns the configured value of the Compress flag
+func (d DumpConfig) IsCompressed() bool {
+	return d.Compress
+}
+
+func (d *DumpConfig) applyDefaults() {
+	if d.DumpFile == "" {
+		d.DumpFile = "dump.sql"
+	}
+	if strings.HasSuffix(d.DumpFile, ".gz") {
+		d.Compress = true
+		d.DumpFile = d.DumpFile[0 : len(d.DumpFile)-3]
+	}
+}
+
+func (d *DumpConfig) dumpFlags() []string {
+	var args []string
+	for _, schema := range d.ExcludeSchemas {
+		args = append(args, "-N", schema)
+	}
+
+	for _, table := range d.ExcludeTables {
+		args = append(args, "-T", table)
+	}
+
+	for _, table := range d.ExcludeData {
+		args = append(args, "--exclude-table-data="+table)
+	}
+
+	for _, schema := range d.IncludeSchemas {
+		args = append(args, "-n", schema)
+	}
+
+	for _, table := range d.IncludeTables {
+		args = append(args, "-t", table)
+	}
+
+	if d.Compress {
+		args = append(args, "-Z", "9")
+	}
+
+	return args
+}
+
 // Config stores the options used by pgmgr.
 type Config struct {
 	// connection
@@ -32,14 +107,17 @@ type Config struct {
 	URL      string
 	SslMode  string
 
+	// dump
+	DumpConfig *DumpConfig `json:"dump-options"`
+
 	// filepaths
-	DumpFile        string `json:"dump-file"`
+	DumpFile        string `json:"dump-file"` // DEPRECATED
 	MigrationFolder string `json:"migration-folder"`
 
 	// options
 	MigrationTable  string   `json:"migration-table"`
 	MigrationDriver string   `json:"migration-driver"`
-	SeedTables      []string `json:"seed-tables"`
+	SeedTables      []string `json:"seed-tables"` // DEPRECATED
 	ColumnType      string   `json:"column-type"`
 	Format          string
 }
@@ -148,6 +226,16 @@ func (config *Config) applyDefaults() {
 	if config.SslMode == "" {
 		config.SslMode = "disable"
 	}
+	if config.DumpConfig == nil {
+		config.DumpConfig = &DumpConfig{}
+	}
+	if config.DumpFile != "" {
+		config.DumpConfig.DumpFile = config.DumpFile
+	}
+	if len(config.SeedTables) > 0 {
+		config.DumpConfig.IncludeTables = config.SeedTables
+	}
+	config.DumpConfig.applyDefaults()
 }
 
 func (config *Config) applyArguments(ctx argumentContext) {
@@ -173,6 +261,7 @@ func (config *Config) applyArguments(ctx argumentContext) {
 		config.SslMode = ctx.String("sslmode")
 	}
 	if ctx.String("dump-file") != "" {
+		deprecatedDumpFieldWarning("dump-file")
 		config.DumpFile = ctx.String("dump-file")
 	}
 	if ctx.String("migration-folder") != "" {
@@ -182,6 +271,7 @@ func (config *Config) applyArguments(ctx argumentContext) {
 		config.MigrationDriver = ctx.String("migration-driver")
 	}
 	if ctx.StringSlice("seed-tables") != nil && len(ctx.StringSlice("seed-tables")) > 0 {
+		deprecatedDumpFieldWarning("seed-tables")
 		config.SeedTables = ctx.StringSlice("seed-tables")
 	}
 }
@@ -254,4 +344,11 @@ func (config *Config) versionColumnType() string {
 	}
 
 	return "INTEGER"
+}
+
+func deprecatedDumpFieldWarning(field string) {
+	fmt.Println(
+		"WARN: Using "+field+" as a top-level key in .pgmgr.json is deprecated.",
+		"Specify it in your config file underneath the 'dump-options' key.",
+	)
 }
