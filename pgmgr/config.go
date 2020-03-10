@@ -33,7 +33,7 @@ type Config struct {
 	SslMode  string
 
 	// dump
-	DumpConfig *DumpConfig `json:"dump-options"`
+	DumpConfig DumpConfig `json:"dump-options"`
 
 	// filepaths
 	MigrationFolder string `json:"migration-folder"`
@@ -157,9 +157,6 @@ func (config *Config) applyDefaults() {
 	}
 	if config.SslMode == "" {
 		config.SslMode = "disable"
-	}
-	if config.DumpConfig == nil {
-		config.DumpConfig = &DumpConfig{}
 	}
 	config.DumpConfig.applyDefaults()
 }

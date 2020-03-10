@@ -19,6 +19,25 @@ type DumpConfig struct {
 	Compress bool
 }
 
+// GetDumpFileRaw returns the literal dump file name as configured
+func (config DumpConfig) GetDumpFileRaw() string {
+	return config.DumpFile
+}
+
+// GetDumpFile returns the true dump file name
+// with or without the specified compression suffix
+func (config DumpConfig) GetDumpFile() string {
+	if config.IsCompressed() {
+		return config.DumpFile + ".gz"
+	}
+	return config.DumpFile
+}
+
+// IsCompressed returns the configured value of the Compress flag
+func (config DumpConfig) IsCompressed() bool {
+	return config.Compress
+}
+
 func (config *DumpConfig) applyArguments(ctx argumentContext) {
 	if sliceValuesGiven(ctx, "exclude-schemas") {
 		config.ExcludeSchemas = ctx.StringSlice("exclude-schemas")
@@ -47,29 +66,6 @@ func (config *DumpConfig) applyArguments(ctx argumentContext) {
 	}
 }
 
-func sliceValuesGiven(ctx argumentContext, key string) bool {
-	return ctx.StringSlice(key) != nil && len(ctx.StringSlice(key)) > 0
-}
-
-// GetDumpFileRaw returns the literal dump file name as configured
-func (config DumpConfig) GetDumpFileRaw() string {
-	return config.DumpFile
-}
-
-// GetDumpFile returns the true dump file name
-// with or without the specified compression suffix
-func (config DumpConfig) GetDumpFile() string {
-	if config.Compress {
-		return config.DumpFile + ".gz"
-	}
-	return config.DumpFile
-}
-
-// IsCompressed returns the configured value of the Compress flag
-func (config DumpConfig) IsCompressed() bool {
-	return config.Compress
-}
-
 func (config *DumpConfig) applyDefaults() {
 	if config.DumpFile == "" {
 		config.DumpFile = "dump.sql"
@@ -78,6 +74,10 @@ func (config *DumpConfig) applyDefaults() {
 		config.Compress = true
 		config.DumpFile = config.DumpFile[0 : len(config.DumpFile)-3]
 	}
+}
+
+func sliceValuesGiven(ctx argumentContext, key string) bool {
+	return ctx.StringSlice(key) != nil && len(ctx.StringSlice(key)) > 0
 }
 
 func (config *DumpConfig) dumpFlags() []string {
