@@ -124,7 +124,7 @@ func main() {
 		cli.StringFlag{
 			Name:   "dump-compression",
 			Value:  "t",
-			Usage:  "whether to compress the database dump (t/f); default t. If t, compression is always set to 9. See pg_dump -Z.",
+			Usage:  "whether to compress the database dump (t/f). If t compression is set to 9. See pg_dump -Z.",
 			EnvVar: "PGMGR_DUMP_COMPRESSION",
 		},
 		cli.StringSliceFlag{
