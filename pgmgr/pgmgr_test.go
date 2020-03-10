@@ -26,7 +26,7 @@ func globalConfig() *Config {
 		MigrationFolder: migrationFolder,
 		MigrationTable:  "schema_migrations",
 		SslMode:         "disable",
-		DumpConfig:      DumpConfig{DumpFile: dumpFile},
+		DumpConfig:      DumpConfig{DumpFile: dumpFile, DumpCompression: "f"},
 	}
 }
 
@@ -68,6 +68,8 @@ func TestDump(t *testing.T) {
 
 	c := globalConfig()
 	err := Dump(c)
+	fmt.Println(c)
+	fmt.Println(c.DumpConfig)
 
 	if err != nil {
 		t.Log(err)

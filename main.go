@@ -121,6 +121,12 @@ func main() {
 			Usage:  "how to apply the migrations. supported options are pq (which will execute the migration as one statement) or psql (which will use the psql binary on your system to execute each line)",
 			EnvVar: "PGMGR_MIGRATION_DRIVER",
 		},
+		cli.StringFlag{
+			Name:   "dump-compression",
+			Value:  "t",
+			Usage:  "whether to compress the database dump (t/f); default t. If t, compression is always set to 9. See pg_dump -Z.",
+			EnvVar: "PGMGR_DUMP_COMPRESSION",
+		},
 		cli.StringSliceFlag{
 			Name:   "seed-tables",
 			Value:  (*cli.StringSlice)(&s),
