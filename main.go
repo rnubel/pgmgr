@@ -124,8 +124,38 @@ func main() {
 		cli.StringSliceFlag{
 			Name:   "seed-tables",
 			Value:  (*cli.StringSlice)(&s),
-			Usage:  "list of tables (or globs matching table names) to dump the data of",
+			Usage:  "DEPRECATED: Use '--include-tables'",
 			EnvVar: "PGMGR_SEED_TABLES",
+		},
+		cli.StringSliceFlag{
+			Name:   "include-tables",
+			Value:  (*cli.StringSlice)(&s),
+			Usage:  "only dump tables matching these table names or globs. See pg_dump -t.",
+			EnvVar: "PGMGR_INCLUDE_TABLES",
+		},
+		cli.StringSliceFlag{
+			Name:   "exclude-tables",
+			Value:  (*cli.StringSlice)(&s),
+			Usage:  "do not dump tables matching these table names or globs. See pg_dump -T.",
+			EnvVar: "PGMGR_EXCLUDE_TABLES",
+		},
+		cli.StringSliceFlag{
+			Name:   "include-schemas",
+			Value:  (*cli.StringSlice)(&s),
+			Usage:  "only dump schemas matching these schema names or globs. See pg_dump -n.",
+			EnvVar: "PGMGR_INCLUDE_SCHEMAS",
+		},
+		cli.StringSliceFlag{
+			Name:   "exclude-schemas",
+			Value:  (*cli.StringSlice)(&s),
+			Usage:  "do not dump any schemas matching these schema names or globs. See pg_dump -N.",
+			EnvVar: "PGMGR_EXCLUDE_SCHEMAS",
+		},
+		cli.StringSliceFlag{
+			Name:   "exclude-table-data",
+			Value:  (*cli.StringSlice)(&s),
+			Usage:  "only dump the definition (without data) for tables matching these names or globs. See pg_dump --exclude-table-data.",
+			EnvVar: "PGMGR_EXCLUDE_TABLE_DATA",
 		},
 	}
 
