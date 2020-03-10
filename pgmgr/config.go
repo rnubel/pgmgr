@@ -84,9 +84,11 @@ func (config *Config) populateFromFile(configFile string) {
 	}
 	if config.DumpFile != "" {
 		deprecatedDumpFieldWarning("dump-file", "dump-file", "top-level key in .pgmgr.json")
+		config.DumpConfig.DumpFile = config.DumpFile
 	}
 	if len(config.SeedTables) != 0 {
 		deprecatedDumpFieldWarning("seed-tables", "include-tables", "top-level key in .pgmgr.json")
+		config.DumpConfig.IncludeTables = config.SeedTables
 	}
 }
 
