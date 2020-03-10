@@ -23,10 +23,10 @@ func globalConfig() *Config {
 		Database:        testDBName,
 		Host:            "localhost",
 		Port:            5432,
-		DumpFile:        dumpFile,
 		MigrationFolder: migrationFolder,
 		MigrationTable:  "schema_migrations",
 		SslMode:         "disable",
+		DumpConfig:      DumpConfig{DumpFile: dumpFile},
 	}
 }
 
@@ -89,7 +89,7 @@ func TestDump(t *testing.T) {
 		t.Fatal("dump does not contain the table data when --seed-tables is not specified")
 	}
 
-	c.SeedTables = append(c.SeedTables, "foos")
+	c.DumpConfig.IncludeTables = append(c.DumpConfig.IncludeTables, "foos")
 	err = Dump(c)
 
 	if err != nil {
