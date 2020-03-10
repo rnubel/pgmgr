@@ -60,8 +60,16 @@ func (config *DumpConfig) applyArguments(ctx argumentContext) {
 		deprecatedDumpFieldWarning("seed-tables", "include-tables", "command line arg")
 		config.IncludeTables = ctx.StringSlice("seed-tables")
 	}
-	config.DumpCompression = ctx.String("dump-compression")
-	config.DumpFile = ctx.String("dump-file")
+	if ctx.String("dump-file") != "" {
+		config.DumpFile = ctx.String("dump-file")
+	}
+	if ctx.String("dump-compression") == "f" {
+		config.DumpCompression = "f"
+	}
+	if strings.HasSuffix(config.DumpFile, ".gz") {
+		config.DumpFile = config.DumpFile[0 : len(config.DumpFile)-3]
+		config.DumpCompression = "t"
+	}
 }
 
 func (config *DumpConfig) applyDefaults() {
@@ -70,9 +78,6 @@ func (config *DumpConfig) applyDefaults() {
 	}
 	if config.DumpCompression == "" {
 		config.DumpCompression = "t"
-	}
-	if strings.HasSuffix(config.DumpFile, ".gz") {
-		config.DumpFile = config.DumpFile[0 : len(config.DumpFile)-3]
 	}
 }
 

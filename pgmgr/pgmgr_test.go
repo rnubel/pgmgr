@@ -68,8 +68,6 @@ func TestDump(t *testing.T) {
 
 	c := globalConfig()
 	err := Dump(c)
-	fmt.Println(c)
-	fmt.Println(c.DumpConfig)
 
 	if err != nil {
 		t.Log(err)
