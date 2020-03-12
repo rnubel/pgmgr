@@ -8,10 +8,7 @@ import (
 func TestDumpFlags(test *testing.T) {
 	c := DumpConfig{
 		IncludeTables:   []string{"iTable1", "iTable2"},
-		IncludeSchemas:  []string{"iSchema1"},
-		ExcludeTables:   []string{"xTable1", "xTable2", "xtable3"},
 		ExcludeSchemas:  []string{},
-		ExcludeData:     []string{"xData1"},
 		DumpCompression: "anyValueOtherThanLowerCaseF",
 	}
 
@@ -21,24 +18,9 @@ func TestDumpFlags(test *testing.T) {
 			test.Fatal("Dump flags should flag each included table with '-t', missing", t)
 		}
 	}
-	for _, t := range c.IncludeSchemas {
-		if !strings.Contains(flags, "-n "+t) {
-			test.Fatal("Dump flags should flag each included schema with '-n', missing", t)
-		}
-	}
-	for _, t := range c.ExcludeTables {
-		if !strings.Contains(flags, "-T "+t) {
-			test.Fatal("Dump flags should flag each excluded table with '-T', missing", t)
-		}
-	}
 	for _, t := range c.ExcludeSchemas {
 		if !strings.Contains(flags, "-N "+t) {
 			test.Fatal("Dump flags should flag each excluded schema with '-N', missing", t)
-		}
-	}
-	for _, t := range c.ExcludeData {
-		if !strings.Contains(flags, "--exclude-table-data="+t) {
-			test.Fatal("Dump flags should flag each excluded table data with '--exclude-table-data', missing", t)
 		}
 	}
 	if !strings.Contains(flags, "-Z 9") {

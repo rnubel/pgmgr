@@ -7,12 +7,9 @@ import "strings"
 type DumpConfig struct {
 	// exclusions
 	ExcludeSchemas []string `json:"exclude-schemas"`
-	ExcludeTables  []string `json:"exclude-tables"`
-	ExcludeData    []string `json:"exclude-data-tables"`
 
 	// inclusions
-	IncludeSchemas []string `json:"include-schemas"`
-	IncludeTables  []string `json:"include-tables"`
+	IncludeTables []string `json:"include-tables"`
 
 	// options
 	DumpCompression string `json:"compress"`
@@ -43,15 +40,6 @@ func (config DumpConfig) IsCompressed() bool {
 func (config *DumpConfig) applyArguments(ctx argumentContext) {
 	if sliceValuesGiven(ctx, "exclude-schemas") {
 		config.ExcludeSchemas = ctx.StringSlice("exclude-schemas")
-	}
-	if sliceValuesGiven(ctx, "exclude-tables") {
-		config.ExcludeTables = ctx.StringSlice("include-tables")
-	}
-	if sliceValuesGiven(ctx, "exclude-table-data") {
-		config.ExcludeData = ctx.StringSlice("exclude-table-data")
-	}
-	if sliceValuesGiven(ctx, "include-schemas") {
-		config.IncludeSchemas = ctx.StringSlice("include-schemas")
 	}
 	if sliceValuesGiven(ctx, "include-tables") {
 		config.IncludeTables = ctx.StringSlice("include-tables")
@@ -89,18 +77,6 @@ func (config DumpConfig) dumpFlags() []string {
 	var args []string
 	for _, schema := range config.ExcludeSchemas {
 		args = append(args, "-N", schema)
-	}
-
-	for _, table := range config.ExcludeTables {
-		args = append(args, "-T", table)
-	}
-
-	for _, table := range config.ExcludeData {
-		args = append(args, "--exclude-table-data="+table)
-	}
-
-	for _, schema := range config.IncludeSchemas {
-		args = append(args, "-n", schema)
 	}
 
 	for _, table := range config.IncludeTables {
