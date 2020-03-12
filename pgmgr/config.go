@@ -19,6 +19,7 @@ type argumentContext interface {
 	String(string) string
 	Int(string) int
 	StringSlice(string) []string
+	Bool(string) bool
 }
 
 // Config stores the options used by pgmgr.

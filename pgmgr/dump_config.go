@@ -9,11 +9,13 @@ type DumpConfig struct {
 	ExcludeSchemas []string `json:"exclude-schemas"`
 
 	// inclusions
-	IncludeTables []string `json:"include-tables"`
+	IncludeTables     []string `json:"include-tables"`
+	IncludePrivileges bool     `json:"include-privileges"`
+	IncludeTriggers   bool     `json:"include-triggers"`
 
 	// options
-	DumpCompression string `json:"compress"`
-	DumpFile        string `json:"dump-file"`
+	Compress bool   `json:"compress"`
+	DumpFile string `json:"dump-file"`
 }
 
 // GetDumpFileRaw returns the literal dump file name as configured
@@ -30,11 +32,11 @@ func (config DumpConfig) GetDumpFile() string {
 	return config.DumpFile
 }
 
-// IsCompressed returns the configured value of the DumpCompression flag.
+// IsCompressed returns the configured value of the Compress flag.
 // Since compression is really beneficial to apply, we greedily
 // set to true for any string value other than "f"
 func (config DumpConfig) IsCompressed() bool {
-	return config.DumpCompression != "f"
+	return config.Compress
 }
 
 func (config *DumpConfig) applyArguments(ctx argumentContext) {
@@ -51,12 +53,18 @@ func (config *DumpConfig) applyArguments(ctx argumentContext) {
 	if ctx.String("dump-file") != "" {
 		config.DumpFile = ctx.String("dump-file")
 	}
-	if ctx.String("dump-compression") == "f" {
-		config.DumpCompression = "f"
+	if !ctx.Bool("compress") {
+		config.Compress = false
+	}
+	if ctx.Bool("include-privileges") {
+		config.IncludePrivileges = true
+	}
+	if ctx.Bool("include-triggers") {
+		config.IncludeTriggers = true
 	}
 	if strings.HasSuffix(config.DumpFile, ".gz") {
 		config.DumpFile = config.DumpFile[0 : len(config.DumpFile)-3]
-		config.DumpCompression = "t"
+		config.Compress = true
 	}
 }
 
@@ -64,28 +72,48 @@ func (config *DumpConfig) applyDefaults() {
 	if config.DumpFile == "" {
 		config.DumpFile = "dump.sql"
 	}
-	if config.DumpCompression == "" {
-		config.DumpCompression = "t"
-	}
+	config.IncludePrivileges = false
+	config.IncludeTriggers = false
+	config.Compress = true
 }
 
 func sliceValuesGiven(ctx argumentContext, key string) bool {
 	return ctx.StringSlice(key) != nil && len(ctx.StringSlice(key)) > 0
 }
 
-func (config DumpConfig) dumpFlags() []string {
+func (config DumpConfig) baseFlags() []string {
 	var args []string
 	for _, schema := range config.ExcludeSchemas {
 		args = append(args, "-N", schema)
-	}
-
-	for _, table := range config.IncludeTables {
-		args = append(args, "-t", table)
 	}
 
 	if config.IsCompressed() {
 		args = append(args, "-Z", "9")
 	}
 
+	if !config.IncludePrivileges {
+		args = append(args, "-x")
+	}
+
+	return args
+}
+
+func (config DumpConfig) schemaFlags() []string {
+	args := config.baseFlags()
+	return append(args, "--schema-only")
+}
+
+func (config DumpConfig) dataFlags() []string {
+	args := config.baseFlags()
+
+	for _, table := range config.IncludeTables {
+		args = append(args, "-t", table)
+	}
+
+	if !config.IncludeTriggers {
+		args = append(args, "--disable-triggers")
+	}
+
+	args = append(args, "--data-only")
 	return args
 }

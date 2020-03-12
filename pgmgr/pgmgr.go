@@ -68,16 +68,15 @@ func Dump(c *Config) error {
 	}
 
 	// See https://www.postgresql.org/docs/11/app-pgdump.html for flag details
-	baseFlags := c.DumpConfig.dumpFlags()
 
 	// first we want the structure to be dumped
-	schemaDump, err := shRead("pg_dump", append(baseFlags, "--schema-only"))
+	schemaDump, err := shRead("pg_dump", c.DumpConfig.schemaFlags())
 	if err != nil {
 		return err
 	}
 
 	// then we want the data to be dumped
-	dataDump, err := shRead("pg_dump", append(baseFlags, "--data-only"))
+	dataDump, err := shRead("pg_dump", c.DumpConfig.dataFlags())
 	if err != nil {
 		return err
 	}

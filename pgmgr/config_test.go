@@ -10,6 +10,7 @@ type TestContext struct {
 	StringVals      map[string]string
 	IntVals         map[string]int
 	StringSliceVals map[string][]string
+	BoolVals        map[string]bool
 }
 
 func (t *TestContext) String(key string) string {
@@ -20,6 +21,9 @@ func (t *TestContext) Int(key string) int {
 }
 func (t *TestContext) StringSlice(key string) []string {
 	return t.StringSliceVals[key]
+}
+func (t *TestContext) Bool(key string) bool {
+	return t.BoolVals[key]
 }
 
 func TestDefaults(t *testing.T) {
