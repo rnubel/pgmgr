@@ -129,21 +129,15 @@ func main() {
 		cli.BoolFlag{
 			Name:   "include-triggers",
 			Usage:  "whether to enable triggers on the dump. See pg_dump --disable-triggers.",
-			EnvVar: "PGMGR_COMPRESS",
+			EnvVar: "PGMGR_INCLUDE_TRIGGERS",
 		},
 		cli.BoolFlag{
 			Name:   "include-privileges",
 			Usage:  "whether to enable access privileges on the dump. See pg_dump -x.",
-			EnvVar: "PGMGR_COMPRESS",
+			EnvVar: "PGMGR_INCLUDE_PRIVILEGES",
 		},
 		cli.StringSliceFlag{
-			Name:   "seed-tables",
-			Value:  (*cli.StringSlice)(&s),
-			Usage:  "DEPRECATED: Use '--include-tables'",
-			EnvVar: "PGMGR_SEED_TABLES",
-		},
-		cli.StringSliceFlag{
-			Name:   "include-tables",
+			Name:   "include-tables,seed-tables",
 			Value:  (*cli.StringSlice)(&s),
 			Usage:  "only dump tables matching these table names or globs. See pg_dump -t.",
 			EnvVar: "PGMGR_INCLUDE_TABLES",
