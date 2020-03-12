@@ -21,6 +21,20 @@ func TestDumpFlags(test *testing.T) {
 	if !strings.Contains(flags, "-Z 9") {
 		test.Fatal("Dump flags should set compression level to 9 when compressed is 't'")
 	}
+	if !strings.Contains(flags, "-x") {
+		test.Fatal("Dump flags should set -x when IncludePrivileges is 'f'")
+	}
+
+	c.Compress = false
+	c.IncludePrivileges = true
+	flags = strings.Join(c.baseFlags(), " ")
+	if strings.Contains(flags, "-Z 9") {
+		test.Fatal("Dump flags should not set compression level to 9 when compressed is 'f'")
+	}
+
+	if strings.Contains(flags, "-x") {
+		test.Fatal("Dump flags should not set -x when IncludePrivileges is 't'")
+	}
 
 	flags = strings.Join(c.dataFlags(), " ")
 	for _, t := range c.IncludeTables {
@@ -31,22 +45,19 @@ func TestDumpFlags(test *testing.T) {
 	if !strings.Contains(flags, "--data-only") {
 		test.Fatal("Data flags should mark --data-only")
 	}
+	if !strings.Contains(flags, "--disable-triggers") {
+		test.Fatal("Data flags should set --disable-triggers when IncludeTriggers is 'f'")
+	}
+
+	c.IncludeTriggers = true
+	flags = strings.Join(c.dataFlags(), " ")
+	if strings.Contains(flags, "--disable-triggers") {
+		test.Fatal("Data flags should not set --disable-triggers when IncludeTriggers is 't'")
+	}
 
 	flags = strings.Join(c.schemaFlags(), " ")
 	if !strings.Contains(flags, "--schema-only") {
 		test.Fatal("Schema flags should mark --schema-only")
-	}
-}
-
-func TestIsCompressed(t *testing.T) {
-	c := DumpConfig{}
-	c.Compress = true
-	if !c.IsCompressed() {
-		t.Fatal("Dump config IsCompressed should be true for any value other than 'f'")
-	}
-	c.Compress = false
-	if c.IsCompressed() {
-		t.Fatal("Dump config IsCompressed should be false when value is 'f'")
 	}
 }
 

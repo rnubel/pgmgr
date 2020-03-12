@@ -100,7 +100,7 @@ func Load(c *Config) error {
 		return err
 	}
 
-	if c.DumpConfig.IsCompressed() {
+	if c.DumpConfig.Compress {
 		sh("gunzip", []string{"-c", c.DumpConfig.GetDumpFile(), ">", c.DumpConfig.GetDumpFileRaw()})
 		defer func() { sh("rm", []string{"-f", c.DumpConfig.GetDumpFileRaw()}) }()
 	}

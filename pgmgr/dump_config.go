@@ -26,17 +26,10 @@ func (config DumpConfig) GetDumpFileRaw() string {
 // GetDumpFile returns the true dump file name
 // with or without the specified compression suffix
 func (config DumpConfig) GetDumpFile() string {
-	if config.IsCompressed() {
+	if config.Compress {
 		return config.DumpFile + ".gz"
 	}
 	return config.DumpFile
-}
-
-// IsCompressed returns the configured value of the Compress flag.
-// Since compression is really beneficial to apply, we greedily
-// set to true for any string value other than "f"
-func (config DumpConfig) IsCompressed() bool {
-	return config.Compress
 }
 
 func (config *DumpConfig) applyArguments(ctx argumentContext) {
@@ -87,7 +80,7 @@ func (config DumpConfig) baseFlags() []string {
 		args = append(args, "-N", schema)
 	}
 
-	if config.IsCompressed() {
+	if config.Compress {
 		args = append(args, "-Z", "9")
 	}
 
