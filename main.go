@@ -121,10 +121,10 @@ func main() {
 			Usage:  "how to apply the migrations. supported options are pq (which will execute the migration as one statement) or psql (which will use the psql binary on your system to execute each line)",
 			EnvVar: "PGMGR_MIGRATION_DRIVER",
 		},
-		cli.BoolTFlag{
-			Name:   "compress",
-			Usage:  "whether to compress the database dump (t/f). If t compression is set to 9. See pg_dump -Z.",
-			EnvVar: "PGMGR_COMPRESS",
+		cli.BoolFlag{
+			Name:   "no-compress",
+			Usage:  "whether to skip compressing the database dump. See pg_dump -Z.",
+			EnvVar: "PGMGR_NO_COMPRESS",
 		},
 		cli.BoolFlag{
 			Name:   "include-triggers",

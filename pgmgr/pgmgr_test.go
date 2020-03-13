@@ -26,7 +26,7 @@ func globalConfig() *Config {
 		MigrationFolder: migrationFolder,
 		MigrationTable:  "schema_migrations",
 		SslMode:         "disable",
-		DumpConfig:      DumpConfig{DumpFile: dumpFile, Compress: false},
+		DumpConfig:      DumpConfig{DumpFile: dumpFile, NoCompress: true},
 	}
 }
 

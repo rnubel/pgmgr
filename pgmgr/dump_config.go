@@ -14,8 +14,8 @@ type DumpConfig struct {
 	IncludeTriggers   bool     `json:"include-triggers"`
 
 	// options
-	Compress bool   `json:"compress"`
-	DumpFile string `json:"dump-file"`
+	NoCompress bool   `json:"no-compress"`
+	DumpFile   string `json:"dump-file"`
 }
 
 // GetDumpFileRaw returns the literal dump file name as configured
@@ -26,10 +26,15 @@ func (config DumpConfig) GetDumpFileRaw() string {
 // GetDumpFile returns the true dump file name
 // with or without the specified compression suffix
 func (config DumpConfig) GetDumpFile() string {
-	if config.Compress {
+	if config.IsCompressed() {
 		return config.DumpFile + ".gz"
 	}
 	return config.DumpFile
+}
+
+// IsCompressed returns whether compression is set
+func (config DumpConfig) IsCompressed() bool {
+	return !config.NoCompress
 }
 
 func (config *DumpConfig) applyArguments(ctx argumentContext) {
@@ -42,8 +47,8 @@ func (config *DumpConfig) applyArguments(ctx argumentContext) {
 	if ctx.String("dump-file") != "" {
 		config.DumpFile = ctx.String("dump-file")
 	}
-	if !ctx.Bool("compress") {
-		config.Compress = false
+	if ctx.Bool("no-compress") {
+		config.NoCompress = true
 	}
 	if ctx.Bool("include-privileges") {
 		config.IncludePrivileges = true
@@ -53,7 +58,7 @@ func (config *DumpConfig) applyArguments(ctx argumentContext) {
 	}
 	if strings.HasSuffix(config.DumpFile, ".gz") {
 		config.DumpFile = config.DumpFile[0 : len(config.DumpFile)-3]
-		config.Compress = true
+		config.NoCompress = false
 	}
 }
 
@@ -61,9 +66,6 @@ func (config *DumpConfig) applyDefaults() {
 	if config.DumpFile == "" {
 		config.DumpFile = "dump.sql"
 	}
-	config.IncludePrivileges = false
-	config.IncludeTriggers = false
-	config.Compress = true
 }
 
 func sliceValuesGiven(ctx argumentContext, key string) bool {
@@ -76,7 +78,7 @@ func (config DumpConfig) baseFlags() []string {
 		args = append(args, "-N", schema)
 	}
 
-	if config.Compress {
+	if config.IsCompressed() {
 		args = append(args, "-Z", "9")
 	}
 

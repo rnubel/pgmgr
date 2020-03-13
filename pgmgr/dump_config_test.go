@@ -9,7 +9,6 @@ func TestDumpFlags(test *testing.T) {
 	c := DumpConfig{
 		IncludeTables:  []string{"iTable1", "iTable2"},
 		ExcludeSchemas: []string{},
-		Compress:       true,
 	}
 
 	flags := strings.Join(c.baseFlags(), " ")
@@ -25,7 +24,7 @@ func TestDumpFlags(test *testing.T) {
 		test.Fatal("Dump flags should set -x when IncludePrivileges is 'f'")
 	}
 
-	c.Compress = false
+	c.NoCompress = true
 	c.IncludePrivileges = true
 	flags = strings.Join(c.baseFlags(), " ")
 	if strings.Contains(flags, "-Z 9") {
@@ -69,8 +68,8 @@ func TestDumpDefaults(t *testing.T) {
 		t.Fatal("dump config's dump-file should default to 'dump.sql', but was ", c.DumpConfig.DumpFile)
 	}
 
-	if !c.DumpConfig.Compress {
-		t.Fatal("dump config's compression should default to 't', but was ", c.DumpConfig.Compress)
+	if c.DumpConfig.NoCompress {
+		t.Fatal("dump config's compression should default to 't', but was ", c.DumpConfig.NoCompress)
 	}
 
 	if c.DumpConfig.IncludePrivileges {
@@ -91,8 +90,8 @@ func TestDumpDefaults(t *testing.T) {
 	if c.DumpConfig.DumpFile != "dump.file.sql" {
 		t.Fatal("dump config should strip '.gz' suffix, but was ", c.DumpConfig.DumpFile)
 	}
-	if !c.DumpConfig.Compress {
-		t.Fatal("dump config should set Compress='t' if '.gz' suffix is present, but was ", c.DumpConfig.Compress)
+	if c.DumpConfig.NoCompress {
+		t.Fatal("dump config should set Compress='t' if '.gz' suffix is present, but was ", c.DumpConfig.NoCompress)
 	}
 }
 
