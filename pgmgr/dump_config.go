@@ -9,7 +9,7 @@ type DumpConfig struct {
 	ExcludeSchemas []string `json:"exclude-schemas"`
 
 	// inclusions
-	IncludeTables     []string `json:"include-tables"`
+	IncludeTables     []string `json:"seed-tables"`
 	IncludePrivileges bool     `json:"include-privileges"`
 	IncludeTriggers   bool     `json:"include-triggers"`
 
@@ -36,11 +36,7 @@ func (config *DumpConfig) applyArguments(ctx argumentContext) {
 	if sliceValuesGiven(ctx, "exclude-schemas") {
 		config.ExcludeSchemas = ctx.StringSlice("exclude-schemas")
 	}
-	if sliceValuesGiven(ctx, "include-tables") {
-		config.IncludeTables = ctx.StringSlice("include-tables")
-	}
 	if sliceValuesGiven(ctx, "seed-tables") {
-		deprecatedDumpFieldWarning("seed-tables", "include-tables", "command line arg")
 		config.IncludeTables = ctx.StringSlice("seed-tables")
 	}
 	if ctx.String("dump-file") != "" {

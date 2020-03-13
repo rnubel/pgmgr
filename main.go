@@ -137,10 +137,10 @@ func main() {
 			EnvVar: "PGMGR_INCLUDE_PRIVILEGES",
 		},
 		cli.StringSliceFlag{
-			Name:   "include-tables,seed-tables",
+			Name:   "seed-tables",
 			Value:  (*cli.StringSlice)(&s),
-			Usage:  "only dump tables matching these table names or globs. See pg_dump -t.",
-			EnvVar: "PGMGR_INCLUDE_TABLES",
+			Usage:  "only dump data from tables matching these table names or globs. See pg_dump -t.",
+			EnvVar: "PGMGR_SEED_TABLES",
 		},
 		cli.StringSliceFlag{
 			Name:   "exclude-schemas",

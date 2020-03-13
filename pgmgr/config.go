@@ -84,11 +84,11 @@ func (config *Config) populateFromFile(configFile string) {
 		fmt.Println("error reading config file: ", err)
 	}
 	if config.DumpFile != "" {
-		deprecatedDumpFieldWarning("dump-file", "dump-file", "top-level key in .pgmgr.json")
+		deprecatedDumpFieldWarning("dump-file")
 		config.DumpConfig.DumpFile = config.DumpFile
 	}
 	if len(config.SeedTables) != 0 {
-		deprecatedDumpFieldWarning("seed-tables", "include-tables", "top-level key in .pgmgr.json")
+		deprecatedDumpFieldWarning("seed-tables")
 		config.DumpConfig.IncludeTables = config.SeedTables
 	}
 }
@@ -265,10 +265,9 @@ func (config *Config) versionColumnType() string {
 	return "INTEGER"
 }
 
-func deprecatedDumpFieldWarning(oldField, newField, provision string) {
+func deprecatedDumpFieldWarning(field string) {
 	fmt.Println(
-		"WARN: Providing '"+oldField+"' as a "+provision+" is deprecated.",
-		"Specify it as '"+newField+"' via the command line, or in your config",
-		"file underneath the 'dump-options' key.",
+		"WARN: Providing '"+field+"' as a top-level config key is deprecated.",
+		"Specify it underneath the 'dump-options' key in your config file.",
 	)
 }
