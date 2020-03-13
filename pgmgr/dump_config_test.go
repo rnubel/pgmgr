@@ -18,7 +18,7 @@ func TestDumpFlags(test *testing.T) {
 		}
 	}
 	if !strings.Contains(flags, "-Z 9") {
-		test.Fatal("Dump flags should set compression level to 9 when compressed is 't'")
+		test.Fatal("Dump flags should set compression level to 9 when NoCompress is 'f'")
 	}
 	if !strings.Contains(flags, "-x") {
 		test.Fatal("Dump flags should set -x when IncludePrivileges is 'f'")
@@ -28,7 +28,7 @@ func TestDumpFlags(test *testing.T) {
 	c.IncludePrivileges = true
 	flags = strings.Join(c.baseFlags(), " ")
 	if strings.Contains(flags, "-Z 9") {
-		test.Fatal("Dump flags should not set compression level to 9 when compressed is 'f'")
+		test.Fatal("Dump flags should not set compression level to 9 when NoCompress is 't'")
 	}
 
 	if strings.Contains(flags, "-x") {
@@ -69,7 +69,7 @@ func TestDumpDefaults(t *testing.T) {
 	}
 
 	if c.DumpConfig.NoCompress {
-		t.Fatal("dump config's compression should default to 't', but was ", c.DumpConfig.NoCompress)
+		t.Fatal("dump config's NoCompress should default to 'f', but was ", c.DumpConfig.NoCompress)
 	}
 
 	if c.DumpConfig.IncludePrivileges {
@@ -91,7 +91,7 @@ func TestDumpDefaults(t *testing.T) {
 		t.Fatal("dump config should strip '.gz' suffix, but was ", c.DumpConfig.DumpFile)
 	}
 	if c.DumpConfig.NoCompress {
-		t.Fatal("dump config should set Compress='t' if '.gz' suffix is present, but was ", c.DumpConfig.NoCompress)
+		t.Fatal("dump config should set NoCompress='f' if '.gz' suffix is present, but was ", c.DumpConfig.NoCompress)
 	}
 }
 
