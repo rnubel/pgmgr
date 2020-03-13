@@ -19,6 +19,7 @@ type argumentContext interface {
 	String(string) string
 	Int(string) int
 	StringSlice(string) []string
+	Bool(string) bool
 }
 
 // Config stores the options used by pgmgr.
@@ -32,16 +33,21 @@ type Config struct {
 	URL      string
 	SslMode  string
 
+	// dump
+	DumpConfig DumpConfig `json:"dump-options"`
+
 	// filepaths
-	DumpFile        string `json:"dump-file"`
 	MigrationFolder string `json:"migration-folder"`
 
 	// options
-	MigrationTable  string   `json:"migration-table"`
-	MigrationDriver string   `json:"migration-driver"`
-	SeedTables      []string `json:"seed-tables"`
-	ColumnType      string   `json:"column-type"`
+	MigrationTable  string `json:"migration-table"`
+	MigrationDriver string `json:"migration-driver"`
+	ColumnType      string `json:"column-type"`
 	Format          string
+
+	// deprecated -- see dump_config.go
+	DumpFile   string   `json:"dump-file"`
+	SeedTables []string `json:"seed-tables"`
 }
 
 // LoadConfig reads the config file, applies CLI arguments as
@@ -67,7 +73,6 @@ func LoadConfig(config *Config, ctx argumentContext) error {
 	if config.URL != "" {
 		config.overrideFromURL()
 	}
-
 	return config.validate()
 }
 
@@ -77,6 +82,14 @@ func (config *Config) populateFromFile(configFile string) {
 		json.Unmarshal(contents, &config)
 	} else {
 		fmt.Println("error reading config file: ", err)
+	}
+	if config.DumpFile != "" {
+		deprecatedDumpFieldWarning("dump-file")
+		config.DumpConfig.DumpFile = config.DumpFile
+	}
+	if len(config.SeedTables) != 0 {
+		deprecatedDumpFieldWarning("seed-tables")
+		config.DumpConfig.IncludeTables = config.SeedTables
 	}
 }
 
@@ -148,6 +161,7 @@ func (config *Config) applyDefaults() {
 	if config.SslMode == "" {
 		config.SslMode = "disable"
 	}
+	config.DumpConfig.applyDefaults()
 }
 
 func (config *Config) applyArguments(ctx argumentContext) {
@@ -172,18 +186,13 @@ func (config *Config) applyArguments(ctx argumentContext) {
 	if ctx.String("sslmode") != "" {
 		config.SslMode = ctx.String("sslmode")
 	}
-	if ctx.String("dump-file") != "" {
-		config.DumpFile = ctx.String("dump-file")
-	}
 	if ctx.String("migration-folder") != "" {
 		config.MigrationFolder = ctx.String("migration-folder")
 	}
 	if ctx.String("migration-driver") != "" {
 		config.MigrationDriver = ctx.String("migration-driver")
 	}
-	if ctx.StringSlice("seed-tables") != nil && len(ctx.StringSlice("seed-tables")) > 0 {
-		config.SeedTables = ctx.StringSlice("seed-tables")
-	}
+	config.DumpConfig.applyArguments(ctx)
 }
 
 func (config *Config) overrideFromURL() {
@@ -254,4 +263,11 @@ func (config *Config) versionColumnType() string {
 	}
 
 	return "INTEGER"
+}
+
+func deprecatedDumpFieldWarning(field string) {
+	fmt.Println(
+		"WARN: Providing '"+field+"' as a top-level config key is deprecated.",
+		"Specify it underneath the 'dump-options' key in your config file.",
+	)
 }

@@ -67,35 +67,28 @@ func Dump(c *Config) error {
 		return err
 	}
 
-	// dump schema first...
-	schema, err := shRead("pg_dump", []string{"--schema-only", c.Database})
+	// See https://www.postgresql.org/docs/11/app-pgdump.html for flag details
+
+	// first we want the structure to be dumped
+	schemaDump, err := shRead("pg_dump", c.DumpConfig.schemaFlags())
 	if err != nil {
 		return err
 	}
 
-	// then selected data...
-	args := []string{c.Database, "--data-only"}
-	if len(c.SeedTables) > 0 {
-		for _, table := range c.SeedTables {
-			println("pulling data for", table)
-			args = append(args, "-t", table)
-		}
-	}
-	println(strings.Join(args, ""))
-
-	seeds, err := shRead("pg_dump", args)
+	// then we want the data to be dumped
+	dataDump, err := shRead("pg_dump", c.DumpConfig.dataFlags())
 	if err != nil {
 		return err
 	}
 
-	// and combine into one file.
-	file, err := os.OpenFile(c.DumpFile, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
+	// combine the results into one dump file.
+	file, err := os.OpenFile(c.DumpConfig.GetDumpFile(), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}
 
-	file.Write(*schema)
-	file.Write(*seeds)
+	file.Write(*schemaDump)
+	file.Write(*dataDump)
 	file.Close()
 
 	return nil
@@ -107,7 +100,12 @@ func Load(c *Config) error {
 		return err
 	}
 
-	return sh("psql", []string{"-d", c.Database, "-f", c.DumpFile})
+	if c.DumpConfig.Compress {
+		sh("gunzip", []string{"-c", c.DumpConfig.GetDumpFile(), ">", c.DumpConfig.GetDumpFileRaw()})
+		defer func() { sh("rm", []string{"-f", c.DumpConfig.GetDumpFileRaw()}) }()
+	}
+
+	return sh("psql", []string{"-d", c.Database, "-f", c.DumpConfig.GetDumpFileRaw()})
 }
 
 // Migrate applies un-applied migrations in the specified MigrationFolder.
@@ -501,7 +499,10 @@ func migrationIsApplied(c *Config, version int64) (bool, error) {
 
 func openConnection(c *Config) (*sql.DB, error) {
 	db, err := sql.Open("postgres", SQLConnectionString(c))
-	return db, err
+	if err != nil {
+		return nil, err
+	}
+	return db, db.Ping()
 }
 
 // SQLConnectionString formats the values pulled from the config into a connection string

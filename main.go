@@ -32,7 +32,7 @@ func main() {
 
 	app.Name = "pgmgr"
 	app.Usage = "manage your app's Postgres database"
-	app.Version = "1.0.1"
+	app.Version = "1.1.0"
 
 	var s []string
 
@@ -121,11 +121,32 @@ func main() {
 			Usage:  "how to apply the migrations. supported options are pq (which will execute the migration as one statement) or psql (which will use the psql binary on your system to execute each line)",
 			EnvVar: "PGMGR_MIGRATION_DRIVER",
 		},
+		cli.BoolTFlag{
+			Name:   "compress",
+			Usage:  "whether to compress the database dump (t/f). If t compression is set to 9. See pg_dump -Z.",
+			EnvVar: "PGMGR_COMPRESS",
+		},
+		cli.BoolFlag{
+			Name:   "include-triggers",
+			Usage:  "whether to enable triggers on the dump. See pg_dump --disable-triggers.",
+			EnvVar: "PGMGR_INCLUDE_TRIGGERS",
+		},
+		cli.BoolFlag{
+			Name:   "include-privileges",
+			Usage:  "whether to enable access privileges on the dump. See pg_dump -x.",
+			EnvVar: "PGMGR_INCLUDE_PRIVILEGES",
+		},
 		cli.StringSliceFlag{
 			Name:   "seed-tables",
 			Value:  (*cli.StringSlice)(&s),
-			Usage:  "list of tables (or globs matching table names) to dump the data of",
+			Usage:  "only dump data from tables matching these table names or globs. See pg_dump -t.",
 			EnvVar: "PGMGR_SEED_TABLES",
+		},
+		cli.StringSliceFlag{
+			Name:   "exclude-schemas",
+			Value:  (*cli.StringSlice)(&s),
+			Usage:  "do not dump any schemas matching these schema names or globs. See pg_dump -N.",
+			EnvVar: "PGMGR_EXCLUDE_SCHEMAS",
 		},
 	}
 
@@ -182,7 +203,7 @@ func main() {
 					Usage: "dumps the database schema and contents to the dump file (see --dump-file)",
 					Action: func(c *cli.Context) error {
 						err := pgmgr.Dump(config)
-						return displayErrorOrMessage(err, "Database dumped to", config.DumpFile, "successfully")
+						return displayErrorOrMessage(err, "Database dumped to", config.DumpConfig.GetDumpFile(), "successfully")
 					},
 				},
 				{
