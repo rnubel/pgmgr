@@ -100,9 +100,21 @@ func Load(c *Config) error {
 		return err
 	}
 
-	if c.DumpConfig.Compress {
-		sh("gunzip", []string{"-c", c.DumpConfig.GetDumpFile(), ">", c.DumpConfig.GetDumpFileRaw()})
+	if c.DumpConfig.IsCompressed() {
+		dumpSQL, err := shRead("gunzip", []string{"-c", c.DumpConfig.GetDumpFile()})
+		if err != nil {
+			return err
+		}
+
 		defer func() { sh("rm", []string{"-f", c.DumpConfig.GetDumpFileRaw()}) }()
+
+		file, err := os.OpenFile(c.DumpConfig.GetDumpFileRaw(), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
+		if err != nil {
+			return err
+		}
+
+		file.Write(*dumpSQL)
+		file.Close()
 	}
 
 	return sh("psql", []string{"-d", c.Database, "-f", c.DumpConfig.GetDumpFileRaw()})
