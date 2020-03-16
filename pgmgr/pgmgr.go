@@ -100,15 +100,22 @@ func Load(c *Config) error {
 		return err
 	}
 
+	dumpFile := c.DumpConfig.GetDumpFile()
+	dumpFileRaw := c.DumpConfig.GetDumpFileRaw()
+	if _, err := os.Stat(dumpFile); os.IsNotExist(err) {
+		fmt.Println("Dump file does not exist or was not provided. Exiting.")
+		return nil
+	}
+
 	if c.DumpConfig.IsCompressed() {
-		dumpSQL, err := shRead("gunzip", []string{"-c", c.DumpConfig.GetDumpFile()})
+		dumpSQL, err := shRead("gunzip", []string{"-c", dumpFile})
 		if err != nil {
 			return err
 		}
 
-		defer func() { sh("rm", []string{"-f", c.DumpConfig.GetDumpFileRaw()}) }()
+		defer func() { sh("rm", []string{"-f", dumpFileRaw}) }()
 
-		file, err := os.OpenFile(c.DumpConfig.GetDumpFileRaw(), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
+		file, err := os.OpenFile(dumpFileRaw, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
 		if err != nil {
 			return err
 		}
@@ -117,7 +124,7 @@ func Load(c *Config) error {
 		file.Close()
 	}
 
-	return sh("psql", []string{"-d", c.Database, "-f", c.DumpConfig.GetDumpFileRaw()})
+	return sh("psql", []string{"-d", c.Database, "-f", dumpFileRaw})
 }
 
 // Migrate applies un-applied migrations in the specified MigrationFolder.
