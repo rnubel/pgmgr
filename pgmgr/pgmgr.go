@@ -307,6 +307,20 @@ func formatPgErr(contents *[]byte, pgerr *pq.Error) string {
 	return fmt.Sprint("PGERROR: line ", lineNo, " pos ", columnNo, ": ", pgerr.Message, ". ", pgerr.Detail)
 }
 
+func timeoutStatements(c *Config) string {
+	stmts := make([]string, 0)
+
+	if c.LockConfig.LockTimeout > 0 {
+		stmts = append(stmts, fmt.Sprintf("SET lock_timeout TO %d;", c.LockConfig.LockTimeout))
+	}
+
+	if c.LockConfig.StatementTimeout > 0 {
+		stmts = append(stmts, fmt.Sprintf("SET statement_timeout TO %d;", c.LockConfig.StatementTimeout))
+	}
+
+	return strings.Join(stmts, "\n") + "\n"
+}
+
 type execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
@@ -335,6 +349,10 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 	}
 	defer os.Remove(tmpfile.Name()) // clean up
 
+	if _, err := tmpfile.WriteString(timeoutStatements(c)); err != nil {
+		return err
+	}
+
 	if _, err := tmpfile.Write(contents); err != nil {
 		return err
 	}
@@ -360,11 +378,17 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 		args = append(args, "-1")
 	}
 
-	if err := sh("psql", args); err != nil {
-		return err
-	}
+	fmt.Println(tmpfile.Name())
 
-	return nil
+	return RetryUntilNonLockingError(func() error {
+		output, err := shRead("psql", args)
+
+		if err == nil {
+			return nil
+		}
+
+		return errors.New(string(*output))
+	}, c.LockConfig.RetryDelay, c.LockConfig.MaxRetries)
 }
 
 func applyMigrationByPq(c *Config, m Migration, direction int) error {
@@ -389,39 +413,46 @@ func applyMigrationByPq(c *Config, m Migration, direction int) error {
 	}
 	exec = db
 
-	if m.WrapInTransaction() {
-		tx, err = db.Begin()
-		if err != nil {
+	return RetryUntilNonLockingError(func() error {
+		if m.WrapInTransaction() {
+			tx, err = db.Begin()
+			if err != nil {
+				return err
+			}
+			exec = tx
+		}
+
+		if _, err = exec.Exec(timeoutStatements(c)); err != nil {
+			rollback()
 			return err
 		}
-		exec = tx
-	}
 
-	if _, err = exec.Exec(string(contents)); err != nil {
-		rollback()
-		return errors.New(formatPgErr(&contents, err.(*pq.Error)))
-	}
-
-	if direction == UP {
-		if err = insertSchemaVersion(c, exec, m.Version); err != nil {
+		if _, err = exec.Exec(string(contents)); err != nil {
 			rollback()
 			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
-	} else {
-		if err = deleteSchemaVersion(c, exec, m.Version); err != nil {
-			rollback()
-			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
-		}
-	}
 
-	if tx != nil {
-		err = tx.Commit()
-		if err != nil {
-			return err
+		if direction == UP {
+			if err = insertSchemaVersion(c, exec, m.Version); err != nil {
+				rollback()
+				return errors.New(formatPgErr(&contents, err.(*pq.Error)))
+			}
+		} else {
+			if err = deleteSchemaVersion(c, exec, m.Version); err != nil {
+				rollback()
+				return errors.New(formatPgErr(&contents, err.(*pq.Error)))
+			}
 		}
-	}
 
-	return nil
+		if tx != nil {
+			err = tx.Commit()
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}, c.LockConfig.RetryDelay, c.LockConfig.MaxRetries)
 }
 
 func createSchemaUnlessExists(c *Config, db *sql.DB) error {

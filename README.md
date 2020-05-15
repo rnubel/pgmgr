@@ -115,6 +115,23 @@ through the Go `pq` library (which runs the migrations as a single multi-stateme
 command) or through the `psql` command-line utility. The possible options are
 `'pq'` or `'psql'`. The default is currently `pq` (subject to change).
 
+### Locking & retry configuration
+On a high-traffic database, attempts within your migrations to lock tables for DDL can often run into locks. To ensure that your patches don't inhibit other activity and to allow them to safely get through these lock scenarios, pgmgr comes with a default set of timeouts and a retry loop. Those timeouts are:
+
+* 200ms to obtain any needed locks
+* 1000ms to apply any individual statement
+
+If you need longer timeouts, set them within your migration SQL (e.g. `SET statement_timeout TO 100000`).
+
+The retry behavior will retry any migration if it detects it as having failed for a lock-related reason. It will attempts up to 10 additional times with a 5-second sleep between each try by default. To customize that behavior, pass either `--max-retries=N`, `--retry-delay=N`, export `PGMGR_MAX_RETRIES=N`, `PGMGR_RETRY_DELAY=N`, or add a `lock-config` block to your `.pgmgr.json` file:
+
+```json
+  "lock-config": {
+    "max-retries": 50,
+    "retry-delay": 1
+  }
+```
+
 ### Environment variables
 
 The values above map to these environment variables:
