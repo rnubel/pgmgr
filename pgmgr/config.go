@@ -192,6 +192,9 @@ func (config *Config) applyArguments(ctx argumentContext) {
 	if ctx.String("migration-driver") != "" {
 		config.MigrationDriver = ctx.String("migration-driver")
 	}
+	if ctx.String("column-type") != "" {
+		config.ColumnType = ctx.String("column-type")
+	}
 	config.DumpConfig.applyArguments(ctx)
 }
 

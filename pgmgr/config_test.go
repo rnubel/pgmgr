@@ -101,6 +101,21 @@ func TestOverlays(t *testing.T) {
 	if c.Port != 123 {
 		t.Fatal("config's port should not change, but was", c.Port)
 	}
+
+	//reset
+	c = &Config{}
+	ctx = &TestContext{StringVals: make(map[string]string)}
+
+	// should prefer the value from ctx, since
+	// it was passed-in explictly at runtime
+	c.ColumnType = "integer"
+	ctx.StringVals["column-type"] = "string"
+
+	LoadConfig(c, ctx)
+
+	if c.ColumnType != "string" {
+		t.Fatal("config's column-type should come from the context, but was", c.ColumnType)
+	}
 }
 
 func TestURL(t *testing.T) {
