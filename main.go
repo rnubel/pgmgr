@@ -93,20 +93,20 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:   "column-type",
-			Value:  "integer",
-			Usage:  "column type to use in schema_migrations table; 'integer' or 'string'",
+			Value:  "",
+			Usage:  "column type to use in schema_migrations table; 'integer' or 'string' (default: integer)",
 			EnvVar: "PGMGR_COLUMN_TYPE",
 		},
 		cli.StringFlag{
 			Name:   "format",
-			Value:  "unix",
-			Usage:  "timestamp format for migrations; 'unix' or 'datetime'",
+			Value:  "",
+			Usage:  "timestamp format for migrations; 'unix' or 'datetime' (default: unix)",
 			EnvVar: "PGMGR_FORMAT",
 		},
 		cli.StringFlag{
 			Name:   "migration-table",
-			Value:  "schema_migrations",
-			Usage:  "table to use for storing migration status; eg 'myschema.applied_migrations'",
+			Value:  "",
+			Usage:  "table to use for storing migration status; eg 'myschema.applied_migrations' (default: schema_migrations)",
 			EnvVar: "PGMGR_MIGRATION_TABLE",
 		},
 		cli.StringFlag{
@@ -118,7 +118,7 @@ func main() {
 		cli.StringFlag{
 			Name:   "migration-driver",
 			Value:  "",
-			Usage:  "how to apply the migrations. supported options are pq (which will execute the migration as one statement) or psql (which will use the psql binary on your system to execute each line)",
+			Usage:  "how to apply the migrations. supported options are pq (which will execute the migration as one statement) or psql (which will use the psql binary on your system to execute each line) (default: pq)",
 			EnvVar: "PGMGR_MIGRATION_DRIVER",
 		},
 		cli.BoolFlag{
