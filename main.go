@@ -32,7 +32,7 @@ func main() {
 
 	app.Name = "pgmgr"
 	app.Usage = "manage your app's Postgres database"
-	app.Version = "1.1.2"
+	app.Version = "1.1.3"
 
 	var s []string
 
