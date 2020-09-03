@@ -391,7 +391,7 @@ func TestMigratePsqlDriver(t *testing.T) {
 	}
 
 	if v != 2 {
-		t.Fatal("expected version 2, got ", v)
+		t.Fatal("expected version 2, got", v)
 	}
 
 	if err := psqlExec(t, `SELECT * FROM foos;`); err != nil {
@@ -404,7 +404,7 @@ func TestMigratePsqlDriver(t *testing.T) {
 
 	v, _ = Version(config)
 	if v != 1 {
-		t.Fatal("expected version 1, got ", v)
+		t.Fatal("expected version 1, got", v)
 	}
 
 	if err := Rollback(config); err != nil {
@@ -413,7 +413,7 @@ func TestMigratePsqlDriver(t *testing.T) {
 
 	v, _ = Version(config)
 	if v != -1 {
-		t.Fatal("expected version -1, got ", v)
+		t.Fatal("expected version -1, got", v)
 	}
 
 	if err := psqlExec(t, `SELECT * FROM foos;`); err == nil {
@@ -426,6 +426,29 @@ func TestMigratePsqlAddsSemicolon(t *testing.T) {
 	clearMigrationFolder(t)
 
 	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER, val BOOLEAN)`)
+
+	config := globalConfig()
+	config.MigrationDriver = "psql"
+
+	if err := Migrate(config); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := Version(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if v != 1 {
+		t.Fatal("Expected migration to apply; did not -- version is still: ", v)
+	}
+}
+
+func TestMigratePsqlAddsNewline(t *testing.T) {
+	resetDB(t)
+	clearMigrationFolder(t)
+
+	writeMigration(t, "001_create_foos.up.sql", `CREATE TABLE foos (foo_id INTEGER, val BOOLEAN); --okay, all done!`)
 
 	config := globalConfig()
 	config.MigrationDriver = "psql"
