@@ -109,6 +109,7 @@ The values above map to these environment variables:
 * `PGMGR_FORMAT`
 * `PGMGR_MIGRATION_TABLE`
 * `PGMGR_MIGRATION_DRIVER`
+* `PGMGR_MIGRATION_FOLDER`
 
 If you prefer to use a connection string, you can set `PGMGR_URL` which will supersede the other configuration settings, e.g.:
 
