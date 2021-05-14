@@ -33,6 +33,9 @@ type Config struct {
 	URL      string
 	SslMode  string
 
+	// normally no need to change this, but we'll support it
+	LockConfig LockConfig `json:"lock-config"`
+
 	// dump
 	DumpConfig DumpConfig `json:"dump-options"`
 
@@ -161,7 +164,9 @@ func (config *Config) applyDefaults() {
 	if config.SslMode == "" {
 		config.SslMode = "disable"
 	}
+
 	config.DumpConfig.applyDefaults()
+	config.LockConfig.applyDefaults()
 }
 
 func (config *Config) applyArguments(ctx argumentContext) {
@@ -192,6 +197,18 @@ func (config *Config) applyArguments(ctx argumentContext) {
 	if ctx.String("migration-driver") != "" {
 		config.MigrationDriver = ctx.String("migration-driver")
 	}
+	if ctx.Int("statement-timeout") != 0 {
+		config.LockConfig.StatementTimeout = ctx.Int("statement-timeout")
+	}
+	if ctx.Int("lock-timeout") != 0 {
+		config.LockConfig.LockTimeout = ctx.Int("lock-timeout")
+	}
+	if ctx.Int("max-retries") != 0 {
+		config.LockConfig.MaxRetries = ctx.Int("max-retries")
+	}
+	if ctx.Int("retry-delay") != 0 {
+		config.LockConfig.RetryDelay = ctx.Int("retry-delay")
+  }
 	if ctx.String("migration-table") != "" {
 		config.MigrationTable = ctx.String("migration-table")
 	}
