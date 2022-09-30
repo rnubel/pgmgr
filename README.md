@@ -13,6 +13,16 @@ reliable, consistent manner. Inspired by [mattes/migrate]
   there's a single, authoritative source of your database structure. It's
   recommended you regularly check this file into source control.
 
+## Installation
+
+```
+$ go install github.com/rnubel/pgmgr@latest
+```
+
+If you cannot run `pgmgr` after this, check that the directory Go install binaries to
+(the `GOBIN` environment variable, which defaults to `$GOPATH/bin` or `$HOME/go/bin`)
+is in your PATH.
+
 ## Getting Started
 
 First, create a `.pgmgr.json` file in your app, as described below. Then,
