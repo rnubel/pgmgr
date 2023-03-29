@@ -53,6 +53,18 @@ $ pgmgr db migrate
 == Completed in 8 ms ==
 ```
 
+## Internals
+
+Under the hood, pgmgr needs to manage an internal schema migrations table to
+track which migrations have been applied to the database. This table is
+automatically created when the `pgmgr db migrate` command is run for the first
+time, or you can create it manually.
+
+To apply each migration, pgmgr uses its configured driver (`pq`, deprecated, or
+`psql`) to run each migration code. It wraps the code in a transaction (unless
+the migration is named with `.no_txn.` in its filename at any point) and adds
+code at the end to log the migration in the schema migrations table.
+
 ## Configuration
 
 `pgmgr` supports file-based configuration (useful for checking into your
@@ -135,10 +147,29 @@ look at the standard Postgres env vars (`PGHOST`, `PGUSERNAME`, etc).
 
 ```
 pgmgr migration MigrationName   # generates files for a new migration
+pgmgr migration --no-txn MName  # generate a migration which will run without wrapping transaction
 pgmgr db create                 # creates the database if it doesn't exist
 pgmgr db drop                   # drop the database
 pgmgr db migrate                # apply un-applied migrations
 pgmgr db rollback               # reverts the latest migration, if possible.
 pgmgr db load                   # loads the schema dump file from PGMGR_DUMP_FILE
 pgmgr db dump                   # dumps the database structure & seeds to PGMGR_DUMP_FILE
+```
+
+## Development
+
+### Running tests
+
+pgmgr tests depend on a running Postgres instance. The easiest way to get all that spun up
+quickly is to use the `act` tool to run the GitHub Actions worfklow manually:
+
+```
+$ act
+```
+
+You can also ensure you have a user with name `postgres` and password `postgres` created in
+your local postgres instance and run the tests directly:
+
+```
+$ go test ./...
 ```

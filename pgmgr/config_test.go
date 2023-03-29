@@ -1,6 +1,7 @@
 package pgmgr
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -31,12 +32,12 @@ func TestDefaults(t *testing.T) {
 
 	LoadConfig(c, &TestContext{})
 
-	if c.Port != 5432 {
-		t.Fatal("config's port should default to 5432")
+	if fmt.Sprint(c.Port) != getEnv("PGMGR_TEST_PORT", "5432") {
+		t.Fatal("config's port should default to 5432 (or value of $PGMGR_TEST_PORT), but was ", c.Port)
 	}
 
-	if c.Host != "localhost" {
-		t.Fatal("config's host should default to localhost, but was ", c.Host)
+	if c.Host != getEnv("PGMGR_TEST_HOST", "localhost") {
+		t.Fatal("config's host should default to localhost (or value of $PGMGR_TEST_HOST), but was ", c.Host)
 	}
 
 	if c.MigrationTable != "schema_migrations" {

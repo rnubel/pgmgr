@@ -3,6 +3,7 @@ package pgmgr
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -17,11 +18,19 @@ const (
 	dumpFile        = "/tmp/pgmgr_dump.sql"
 )
 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
 func globalConfig() *Config {
 	return &Config{
-		Username:        "pgmgr",
+		Username:        "postgres",
+		Password:        "postgres",
 		Database:        testDBName,
-		Host:            "localhost",
+		Host:            getEnv("PGMGR_TEST_HOST", "localhost"),
 		Port:            5432,
 		MigrationFolder: migrationFolder,
 		MigrationTable:  "schema_migrations",
@@ -31,12 +40,18 @@ func globalConfig() *Config {
 }
 
 func TestCreate(t *testing.T) {
-	dropDB(t)
+	if err := dropDB(t); err != nil {
+		t.Log("database already does not exist; skipping dropdb")
+	}
+
+	t.Log("creating database...")
 
 	if err := Create(globalConfig()); err != nil {
 		t.Log(err)
 		t.Fatal("Could not create database")
 	}
+
+	t.Log("creating database done")
 
 	// if we can't remove that db, it couldn't have been created by us above.
 	if err := dropDB(t); err != nil {
