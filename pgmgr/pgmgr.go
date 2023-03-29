@@ -49,7 +49,7 @@ func Create(c *Config) error {
 		return err
 	}
 
-	return sh("createdb", []string{c.Database})
+	return sh("createdb", []string{"-w", c.Database})
 }
 
 // Drop drops the database specified by the configuration.
@@ -58,7 +58,7 @@ func Drop(c *Config) error {
 		return err
 	}
 
-	return sh("dropdb", []string{c.Database})
+	return sh("dropdb", []string{"-w", c.Database})
 }
 
 // Dump dumps the schema and contents of the database to the dump file.
