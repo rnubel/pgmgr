@@ -35,8 +35,8 @@ func TestDefaults(t *testing.T) {
 		t.Fatal("config's port should default to 5432")
 	}
 
-	if c.Host != "localhost" {
-		t.Fatal("config's host should default to localhost, but was ", c.Host)
+	if c.Host != getEnv("PGMGR_TEST_HOST", "localhost") {
+		t.Fatal("config's host should default to localhost (or value of $PGMGR_TEST_HOST), but was ", c.Host)
 	}
 
 	if c.MigrationTable != "schema_migrations" {
