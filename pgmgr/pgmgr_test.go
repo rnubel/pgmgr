@@ -3,6 +3,7 @@ package pgmgr
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -17,11 +18,18 @@ const (
 	dumpFile        = "/tmp/pgmgr_dump.sql"
 )
 
+func getEnv(key, fallback string) string {
+    if value, ok := os.LookupEnv(key); ok {
+        return value
+    }
+    return fallback
+}
+
 func globalConfig() *Config {
 	return &Config{
 		Username:        "pgmgr",
 		Database:        testDBName,
-		Host:            "localhost",
+		Host:            getEnv("PGMGR_TEST_HOST", "localhost"),
 		Port:            5432,
 		MigrationFolder: migrationFolder,
 		MigrationTable:  "schema_migrations",
