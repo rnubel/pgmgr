@@ -150,7 +150,7 @@ func Migrate(c *Config) error {
 				return err
 			}
 
-			fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
+			fmt.Println("== Completed in", time.Since(t0).Nanoseconds()/1e6, "ms ==")
 			appliedAny = true
 		}
 	}
@@ -191,7 +191,7 @@ func Rollback(c *Config) error {
 		return err
 	}
 
-	fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
+	fmt.Println("== Completed in", time.Since(t0).Nanoseconds()/1e6, "ms ==")
 
 	return nil
 }
@@ -201,11 +201,10 @@ func Rollback(c *Config) error {
 // be backdated migrations which have not yet applied.
 func Version(c *Config) (int64, error) {
 	db, err := openConnection(c)
-	defer db.Close()
-
 	if err != nil {
 		return -1, err
 	}
+	defer db.Close()
 
 	exists, err := migrationTableExists(c, db)
 	if err != nil {
@@ -228,10 +227,10 @@ func Version(c *Config) (int64, error) {
 // Initialize creates the schema_migrations table if necessary.
 func Initialize(c *Config) error {
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
 	if err := createSchemaUnlessExists(c, db); err != nil {
 		return err
@@ -307,6 +306,20 @@ func formatPgErr(contents *[]byte, pgerr *pq.Error) string {
 	return fmt.Sprint("PGERROR: line ", lineNo, " pos ", columnNo, ": ", pgerr.Message, ". ", pgerr.Detail)
 }
 
+func timeoutStatements(c *Config) string {
+	stmts := make([]string, 0)
+
+	if c.LockConfig.LockTimeout > 0 {
+		stmts = append(stmts, fmt.Sprintf("SET lock_timeout TO %d;", c.LockConfig.LockTimeout))
+	}
+
+	if c.LockConfig.StatementTimeout > 0 {
+		stmts = append(stmts, fmt.Sprintf("SET statement_timeout TO %d;", c.LockConfig.StatementTimeout))
+	}
+
+	return strings.Join(stmts, "\n") + "\n"
+}
+
 type execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
@@ -335,6 +348,10 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 	}
 	defer os.Remove(tmpfile.Name()) // clean up
 
+	if _, err := tmpfile.WriteString(timeoutStatements(c)); err != nil {
+		return err
+	}
+
 	if _, err := tmpfile.Write(contents); err != nil {
 		return err
 	}
@@ -355,16 +372,25 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 
 	migrationFilePath := tmpfile.Name()
 	args := []string{"-f", migrationFilePath, "-v", "ON_ERROR_STOP=1"}
+	maxRetries := c.LockConfig.MaxRetries
 
 	if m.WrapInTransaction() {
 		args = append(args, "-1")
+	} else {
+		maxRetries = 0 // no retries if not in a transaction
 	}
 
-	if err := sh("psql", args); err != nil {
-		return err
-	}
+	fmt.Println(tmpfile.Name())
 
-	return nil
+	return RetryUntilNonLockingError(func() error {
+		output, err := shRead("psql", args)
+
+		if err == nil {
+			return nil
+		}
+
+		return errors.New(string(*output))
+	}, c.LockConfig.RetryDelay, maxRetries)
 }
 
 func applyMigrationByPq(c *Config, m Migration, direction int) error {
@@ -383,45 +409,57 @@ func applyMigrationByPq(c *Config, m Migration, direction int) error {
 	}
 
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 	exec = db
 
-	if m.WrapInTransaction() {
-		tx, err = db.Begin()
-		if err != nil {
+	maxRetries := c.LockConfig.MaxRetries
+	if !m.WrapInTransaction() {
+		maxRetries = 0
+	}
+
+	return RetryUntilNonLockingError(func() error {
+		if m.WrapInTransaction() {
+			tx, err = db.Begin()
+			if err != nil {
+				return err
+			}
+			exec = tx
+		}
+
+		if _, err = exec.Exec(timeoutStatements(c)); err != nil {
+			rollback()
 			return err
 		}
-		exec = tx
-	}
 
-	if _, err = exec.Exec(string(contents)); err != nil {
-		rollback()
-		return errors.New(formatPgErr(&contents, err.(*pq.Error)))
-	}
-
-	if direction == UP {
-		if err = insertSchemaVersion(c, exec, m.Version); err != nil {
+		if _, err = exec.Exec(string(contents)); err != nil {
 			rollback()
 			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
 		}
-	} else {
-		if err = deleteSchemaVersion(c, exec, m.Version); err != nil {
-			rollback()
-			return errors.New(formatPgErr(&contents, err.(*pq.Error)))
-		}
-	}
 
-	if tx != nil {
-		err = tx.Commit()
-		if err != nil {
-			return err
+		if direction == UP {
+			if err = insertSchemaVersion(c, exec, m.Version); err != nil {
+				rollback()
+				return errors.New(formatPgErr(&contents, err.(*pq.Error)))
+			}
+		} else {
+			if err = deleteSchemaVersion(c, exec, m.Version); err != nil {
+				rollback()
+				return errors.New(formatPgErr(&contents, err.(*pq.Error)))
+			}
 		}
-	}
 
-	return nil
+		if tx != nil {
+			err = tx.Commit()
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}, c.LockConfig.RetryDelay, maxRetries)
 }
 
 func createSchemaUnlessExists(c *Config, db *sql.DB) error {
@@ -498,10 +536,10 @@ func migrationTableExists(c *Config, db *sql.DB) (bool, error) {
 
 func migrationIsApplied(c *Config, version int64) (bool, error) {
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return false, err
 	}
+	defer db.Close()
 
 	var applied bool
 	err = db.QueryRow(
@@ -585,7 +623,7 @@ func shRead(command string, args []string) (*[]byte, error) {
 }
 
 func printFailedMigrationMessage(err error, migrationType string) {
-	fmt.Fprintf(os.Stderr, err.Error())
-	fmt.Fprintf(os.Stderr, "\n\n")
-	fmt.Fprintf(os.Stderr, "ERROR! Aborting the "+migrationType+" process.\n")
+	fmt.Fprintln(os.Stderr, err.Error())
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "ERROR! Aborting the "+migrationType+" process.\n")
 }
