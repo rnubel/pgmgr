@@ -150,7 +150,7 @@ func Migrate(c *Config) error {
 				return err
 			}
 
-			fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
+			fmt.Println("== Completed in", time.Since(t0).Nanoseconds()/1e6, "ms ==")
 			appliedAny = true
 		}
 	}
@@ -191,7 +191,7 @@ func Rollback(c *Config) error {
 		return err
 	}
 
-	fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
+	fmt.Println("== Completed in", time.Since(t0).Nanoseconds()/1e6, "ms ==")
 
 	return nil
 }
@@ -201,11 +201,10 @@ func Rollback(c *Config) error {
 // be backdated migrations which have not yet applied.
 func Version(c *Config) (int64, error) {
 	db, err := openConnection(c)
-	defer db.Close()
-
 	if err != nil {
 		return -1, err
 	}
+	defer db.Close()
 
 	exists, err := migrationTableExists(c, db)
 	if err != nil {
@@ -228,10 +227,10 @@ func Version(c *Config) (int64, error) {
 // Initialize creates the schema_migrations table if necessary.
 func Initialize(c *Config) error {
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
 	if err := createSchemaUnlessExists(c, db); err != nil {
 		return err
@@ -373,9 +372,12 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 
 	migrationFilePath := tmpfile.Name()
 	args := []string{"-f", migrationFilePath, "-v", "ON_ERROR_STOP=1"}
+	maxRetries := c.LockConfig.MaxRetries
 
 	if m.WrapInTransaction() {
 		args = append(args, "-1")
+	} else {
+		maxRetries = 0 // no retries if not in a transaction
 	}
 
 	fmt.Println(tmpfile.Name())
@@ -388,7 +390,7 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 		}
 
 		return errors.New(string(*output))
-	}, c.LockConfig.RetryDelay, c.LockConfig.MaxRetries)
+	}, c.LockConfig.RetryDelay, maxRetries)
 }
 
 func applyMigrationByPq(c *Config, m Migration, direction int) error {
@@ -407,11 +409,16 @@ func applyMigrationByPq(c *Config, m Migration, direction int) error {
 	}
 
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 	exec = db
+
+	maxRetries := c.LockConfig.MaxRetries
+	if !m.WrapInTransaction() {
+		maxRetries = 0
+	}
 
 	return RetryUntilNonLockingError(func() error {
 		if m.WrapInTransaction() {
@@ -452,7 +459,7 @@ func applyMigrationByPq(c *Config, m Migration, direction int) error {
 		}
 
 		return nil
-	}, c.LockConfig.RetryDelay, c.LockConfig.MaxRetries)
+	}, c.LockConfig.RetryDelay, maxRetries)
 }
 
 func createSchemaUnlessExists(c *Config, db *sql.DB) error {
@@ -529,10 +536,10 @@ func migrationTableExists(c *Config, db *sql.DB) (bool, error) {
 
 func migrationIsApplied(c *Config, version int64) (bool, error) {
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return false, err
 	}
+	defer db.Close()
 
 	var applied bool
 	err = db.QueryRow(
@@ -616,7 +623,7 @@ func shRead(command string, args []string) (*[]byte, error) {
 }
 
 func printFailedMigrationMessage(err error, migrationType string) {
-	fmt.Fprintf(os.Stderr, err.Error())
-	fmt.Fprintf(os.Stderr, "\n\n")
-	fmt.Fprintf(os.Stderr, "ERROR! Aborting the "+migrationType+" process.\n")
+	fmt.Fprintln(os.Stderr, err.Error())
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "ERROR! Aborting the "+migrationType+" process.\n")
 }

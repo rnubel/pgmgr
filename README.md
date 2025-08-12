@@ -132,6 +132,9 @@ The retry behavior will retry any migration if it detects it as having failed fo
   }
 ```
 
+**Note:** Retries are disabled for transactions marked with `.no_txn.`, since such migrations can partially
+apply and aren't safe to automatically retry.
+
 ### Environment variables
 
 The values above map to these environment variables:
