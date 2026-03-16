@@ -148,6 +148,26 @@ func main() {
 			Usage:  "do not dump any schemas matching these schema names or globs. See pg_dump -N.",
 			EnvVar: "PGMGR_EXCLUDE_SCHEMAS",
 		},
+		cli.IntFlag{
+			Name:   "statement-timeout",
+			Usage:  "the value of statement_timeout to set for each migration (default: 1000) in ms",
+			EnvVar: "PGMGR_STATEMENT_TIMEOUT",
+		},
+		cli.IntFlag{
+			Name:   "lock-timeout",
+			Usage:  "the value of lock_timeout to set for each migration (default: 200) in ms",
+			EnvVar: "PGMGR_LOCK_TIMEOUT",
+		},
+		cli.IntFlag{
+			Name:   "max-retries",
+			Usage:  "limit the max retries when a migration fails due to a locking timeout. Set to -1 to disable retries.",
+			EnvVar: "PGMGR_MAX_RETRIES",
+		},
+		cli.IntFlag{
+			Name:   "retry-delay",
+			Usage:  "the delay between lock-related retries (in seconds). Set to -1 to have no delay.",
+			EnvVar: "PGMGR_RETRY_DELAY",
+		},
 	}
 
 	app.Before = func(c *cli.Context) error {
