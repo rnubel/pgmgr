@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -87,11 +86,13 @@ func Dump(c *Config) error {
 		return err
 	}
 
-	file.Write(*schemaDump)
-	file.Write(*dataDump)
-	file.Close()
-
-	return nil
+	if _, err = file.Write(*schemaDump); err != nil {
+		return err
+	}
+	if _, err = file.Write(*dataDump); err != nil {
+		return err
+	}
+	return file.Close()
 }
 
 // Load loads the database from the dump file using psql.
@@ -113,15 +114,19 @@ func Load(c *Config) error {
 			return err
 		}
 
-		defer func() { sh("rm", []string{"-f", dumpFileRaw}) }()
+		defer func() { sh("rm", []string{"-f", dumpFileRaw}) }() //nolint:errcheck // best-effort cleanup
 
 		file, err := os.OpenFile(dumpFileRaw, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
 		if err != nil {
 			return err
 		}
 
-		file.Write(*dumpSQL)
-		file.Close()
+		if _, err = file.Write(*dumpSQL); err != nil {
+			return err
+		}
+		if err = file.Close(); err != nil {
+			return err
+		}
 	}
 
 	return sh("psql", []string{"-d", c.Database, "-f", dumpFileRaw})
@@ -150,7 +155,7 @@ func Migrate(c *Config) error {
 				return err
 			}
 
-			fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
+			fmt.Println("== Completed in", time.Since(t0).Nanoseconds()/1e6, "ms ==")
 			appliedAny = true
 		}
 	}
@@ -191,7 +196,7 @@ func Rollback(c *Config) error {
 		return err
 	}
 
-	fmt.Println("== Completed in", time.Now().Sub(t0).Nanoseconds()/1e6, "ms ==")
+	fmt.Println("== Completed in", time.Since(t0).Nanoseconds()/1e6, "ms ==")
 
 	return nil
 }
@@ -201,11 +206,10 @@ func Rollback(c *Config) error {
 // be backdated migrations which have not yet applied.
 func Version(c *Config) (int64, error) {
 	db, err := openConnection(c)
-	defer db.Close()
-
 	if err != nil {
 		return -1, err
 	}
+	defer db.Close() //nolint:errcheck
 
 	exists, err := migrationTableExists(c, db)
 	if err != nil {
@@ -228,10 +232,10 @@ func Version(c *Config) (int64, error) {
 // Initialize creates the schema_migrations table if necessary.
 func Initialize(c *Config) error {
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return err
 	}
+	defer db.Close() //nolint:errcheck
 
 	if err := createSchemaUnlessExists(c, db); err != nil {
 		return err
@@ -271,13 +275,13 @@ func CreateMigration(c *Config, name string, noTransaction bool) error {
 	upFilepath := filepath.Join(c.MigrationFolder, prefix+".up.sql")
 	downFilepath := filepath.Join(c.MigrationFolder, prefix+".down.sql")
 
-	err := ioutil.WriteFile(upFilepath, []byte(`-- Migration goes here.`), 0644)
+	err := os.WriteFile(upFilepath, []byte(`-- Migration goes here.`), 0644)
 	if err != nil {
 		return err
 	}
 	fmt.Println("Created", upFilepath)
 
-	err = ioutil.WriteFile(downFilepath, []byte(`-- Rollback of migration goes here. If you don't want to write it, delete this file.`), 0644)
+	err = os.WriteFile(downFilepath, []byte(`-- Rollback of migration goes here. If you don't want to write it, delete this file.`), 0644)
 	if err != nil {
 		return err
 	}
@@ -324,29 +328,29 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 		return err
 	}
 
-	contents, err := ioutil.ReadFile(filepath.Join(c.MigrationFolder, m.Filename))
+	contents, err := os.ReadFile(filepath.Join(c.MigrationFolder, m.Filename))
 	if err != nil {
 		return err
 	}
 
-	tmpfile, err := ioutil.TempFile("", "migration")
+	tmpfile, err := os.CreateTemp("", "migration")
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpfile.Name()) // clean up
+	defer os.Remove(tmpfile.Name()) //nolint:errcheck // best-effort cleanup
 
 	if _, err := tmpfile.Write(contents); err != nil {
 		return err
 	}
 
+	var wsErr error
 	if direction == UP {
-		tmpfile.WriteString(
-			fmt.Sprintf("\n; INSERT INTO %s (version) VALUES ('%d');", c.quotedMigrationTable(), m.Version),
-		)
+		_, wsErr = fmt.Fprintf(tmpfile, "\n; INSERT INTO %s (version) VALUES ('%d');", c.quotedMigrationTable(), m.Version)
 	} else { // DOWN
-		tmpfile.WriteString(
-			fmt.Sprintf("\n; DELETE FROM %s WHERE version = '%d';", c.quotedMigrationTable(), m.Version),
-		)
+		_, wsErr = fmt.Fprintf(tmpfile, "\n; DELETE FROM %s WHERE version = '%d';", c.quotedMigrationTable(), m.Version)
+	}
+	if wsErr != nil {
+		return wsErr
 	}
 
 	if err := tmpfile.Close(); err != nil {
@@ -373,20 +377,20 @@ func applyMigrationByPq(c *Config, m Migration, direction int) error {
 
 	rollback := func() {
 		if tx != nil {
-			tx.Rollback()
+			tx.Rollback() //nolint:errcheck // best-effort rollback on error path
 		}
 	}
 
-	contents, err := ioutil.ReadFile(filepath.Join(c.MigrationFolder, m.Filename))
+	contents, err := os.ReadFile(filepath.Join(c.MigrationFolder, m.Filename))
 	if err != nil {
 		return err
 	}
 
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return err
 	}
+	defer db.Close() //nolint:errcheck
 	exec = db
 
 	if m.WrapInTransaction() {
@@ -498,10 +502,10 @@ func migrationTableExists(c *Config, db *sql.DB) (bool, error) {
 
 func migrationIsApplied(c *Config, version int64) (bool, error) {
 	db, err := openConnection(c)
-	defer db.Close()
 	if err != nil {
 		return false, err
 	}
+	defer db.Close() //nolint:errcheck
 
 	var applied bool
 	err = db.QueryRow(
@@ -552,7 +556,7 @@ func migrations(c *Config, direction string) ([]Migration, error) {
 	re := regexp.MustCompile("^[0-9]+")
 
 	migrations := []Migration{}
-	files, err := ioutil.ReadDir(c.MigrationFolder)
+	files, err := os.ReadDir(c.MigrationFolder)
 	if err != nil {
 		return migrations, err
 	}

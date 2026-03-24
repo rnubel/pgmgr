@@ -30,7 +30,9 @@ func (t *TestContext) Bool(key string) bool {
 func TestDefaults(t *testing.T) {
 	c := &Config{}
 
-	LoadConfig(c, &TestContext{})
+	if err := LoadConfig(c, &TestContext{}); err != nil {
+		t.Fatal("LoadConfig failed:", err)
+	}
 
 	if fmt.Sprint(c.Port) != getEnv("PGMGR_TEST_PORT", "5432") {
 		t.Fatal("config's port should default to 5432 (or value of $PGMGR_TEST_PORT), but was ", c.Port)
@@ -65,9 +67,13 @@ func TestOverlays(t *testing.T) {
 	// it was passed-in explictly at runtime
 	c.Port = 123
 	ctx.IntVals["port"] = 456
-	os.Setenv("PGPORT", "789")
+	if err := os.Setenv("PGPORT", "789"); err != nil {
+		t.Fatal(err)
+	}
 
-	LoadConfig(c, ctx)
+	if err := LoadConfig(c, ctx); err != nil {
+		t.Fatal("LoadConfig failed:", err)
+	}
 
 	if c.Port != 456 {
 		t.Fatal("config's port should come from the context, but was", c.Port)
@@ -80,9 +86,13 @@ func TestOverlays(t *testing.T) {
 	// should prefer the value from PGPORT, since
 	// nothing was passed-in at runtime
 	c.Port = 123
-	os.Setenv("PGPORT", "789")
+	if err := os.Setenv("PGPORT", "789"); err != nil {
+		t.Fatal(err)
+	}
 
-	LoadConfig(c, ctx)
+	if err := LoadConfig(c, ctx); err != nil {
+		t.Fatal("LoadConfig failed:", err)
+	}
 
 	if c.Port != 789 {
 		t.Fatal("config's port should come from PGPORT, but was", c.Port)
@@ -95,9 +105,13 @@ func TestOverlays(t *testing.T) {
 	// should prefer the value in the struct, since
 	// nothing else is given
 	c.Port = 123
-	os.Setenv("PGPORT", "")
+	if err := os.Setenv("PGPORT", ""); err != nil {
+		t.Fatal(err)
+	}
 
-	LoadConfig(c, ctx)
+	if err := LoadConfig(c, ctx); err != nil {
+		t.Fatal("LoadConfig failed:", err)
+	}
 
 	if c.Port != 123 {
 		t.Fatal("config's port should not change, but was", c.Port)
@@ -112,7 +126,9 @@ func TestOverlays(t *testing.T) {
 	c.ColumnType = "integer"
 	ctx.StringVals["column-type"] = "string"
 
-	LoadConfig(c, ctx)
+	if err := LoadConfig(c, ctx); err != nil {
+		t.Fatal("LoadConfig failed:", err)
+	}
 
 	if c.ColumnType != "string" {
 		t.Fatal("config's column-type should come from the context, but was", c.ColumnType)
@@ -123,7 +139,9 @@ func TestURL(t *testing.T) {
 	c := &Config{}
 	c.URL = "postgres://foo@bar:5431/test-db.one?sslmode=verify-ca"
 
-	LoadConfig(c, &TestContext{})
+	if err := LoadConfig(c, &TestContext{}); err != nil {
+		t.Fatal("LoadConfig failed:", err)
+	}
 
 	if c.Username != "foo" || c.Host != "bar" || c.Port != 5431 || c.Database != "test-db.one" || c.SslMode != "verify-ca" {
 		t.Fatal("config did not populate itself from the given URL:", c)
@@ -134,7 +152,9 @@ func TestURLWithPassword(t *testing.T) {
 	c := &Config{}
 	c.URL = "postgres://foo:baz@bar:5431/test-db.one?sslmode=verify-ca"
 
-	LoadConfig(c, &TestContext{})
+	if err := LoadConfig(c, &TestContext{}); err != nil {
+		t.Fatal("LoadConfig failed:", err)
+	}
 
 	if c.Username != "foo" || c.Password != "baz" || c.Host != "bar" || c.Port != 5431 || c.Database != "test-db.one" || c.SslMode != "verify-ca" {
 		t.Fatal("config did not populate itself from the given URL:", c)

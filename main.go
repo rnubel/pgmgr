@@ -242,8 +242,7 @@ func main() {
 					Name:  "rollback",
 					Usage: "rolls back the latest migration",
 					Action: func(c *cli.Context) error {
-						pgmgr.Rollback(config)
-						return nil
+						return displayErrorOrMessage(pgmgr.Rollback(config))
 					},
 				},
 			},
@@ -251,9 +250,11 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		app.Command("help").Run(c)
-		return nil
+		return app.Command("help").Run(c)
 	}
 
-	app.Run(os.Args)
+	if err := app.Run(os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
