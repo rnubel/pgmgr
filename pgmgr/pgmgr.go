@@ -585,7 +585,7 @@ func shRead(command string, args []string) (*[]byte, error) {
 }
 
 func printFailedMigrationMessage(err error, migrationType string) {
-	fmt.Fprintf(os.Stderr, err.Error())
+	fmt.Fprintf(os.Stderr, "%s", err.Error())
 	fmt.Fprintf(os.Stderr, "\n\n")
-	fmt.Fprintf(os.Stderr, "ERROR! Aborting the "+migrationType+" process.\n")
+	fmt.Fprintf(os.Stderr, "ERROR! Aborting the %s process.\n", migrationType)
 }
