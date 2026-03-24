@@ -2,7 +2,6 @@ package pgmgr
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -89,13 +88,13 @@ func TestDump(t *testing.T) {
 		t.Fatal("Could not dump database to file")
 	}
 
-	file, err := ioutil.ReadFile(dumpFile)
+	file, err := os.ReadFile(dumpFile)
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not read dump")
 	}
 
-	if !(strings.Contains(string(file), "CREATE TABLE bars") || strings.Contains(string(file), "CREATE TABLE public.bars")) {
+	if !strings.Contains(string(file), "CREATE TABLE bars") && !strings.Contains(string(file), "CREATE TABLE public.bars") {
 		t.Log(string(file))
 		t.Fatal("dump does not contain the table definition")
 	}
@@ -112,7 +111,7 @@ func TestDump(t *testing.T) {
 		t.Fatal("Could not dump database to file")
 	}
 
-	file, err = ioutil.ReadFile(dumpFile)
+	file, err = os.ReadFile(dumpFile)
 	if err != nil {
 		t.Log(err)
 		t.Fatal("Could not read dump")
@@ -130,10 +129,12 @@ func TestDump(t *testing.T) {
 func TestLoad(t *testing.T) {
 	resetDB(t)
 
-	ioutil.WriteFile(dumpFile, []byte(`
+	if err := os.WriteFile(dumpFile, []byte(`
 		CREATE TABLE foos (foo_id INTEGER);
 		INSERT INTO foos (foo_id) VALUES (1), (2), (3);
-	`), 0644)
+	`), 0644); err != nil {
+		t.Fatal("Could not write dump file:", err)
+	}
 
 	err := Load(globalConfig())
 
@@ -206,10 +207,15 @@ func TestVersion(t *testing.T) {
 		t.Fatal("expected version to be -1 before table exists, got", version)
 	}
 
-	Initialize(globalConfig())
+	if err := Initialize(globalConfig()); err != nil {
+		t.Fatal("Initialize failed:", err)
+	}
 	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES (1);`)
 
 	version, err = Version(globalConfig())
+	if err != nil {
+		t.Fatal("Could not fetch version after insert:", err)
+	}
 	if version != 1 {
 		t.Fatal("expected version to be 1, got", version)
 	}
@@ -220,7 +226,9 @@ func TestColumnTypeString(t *testing.T) {
 
 	config := globalConfig()
 	config.ColumnType = "string"
-	Initialize(config)
+	if err := Initialize(config); err != nil {
+		t.Fatal("Initialize failed:", err)
+	}
 
 	psqlMustExec(t, `INSERT INTO schema_migrations (version) VALUES ('20150910120933');`)
 	version, err := Version(config)
@@ -290,7 +298,9 @@ func TestMigrate(t *testing.T) {
 	psqlMustNotExec(t, `SELECT * FROM baz;`)
 
 	// rollback the initial migration, since it has the latest version
-	err = Rollback(globalConfig())
+	if err := Rollback(globalConfig()); err != nil {
+		t.Fatal("Rollback failed:", err)
+	}
 
 	if err := psqlExec(t, `SELECT * FROM foos;`); err == nil {
 		t.Fatal("Should not have been able to select from foos table")
@@ -644,13 +654,16 @@ func createDB(t *testing.T) error {
 }
 
 func clearMigrationFolder(t *testing.T) {
-	testSh(t, "rm", []string{"-r", migrationFolder})
-	testSh(t, "mkdir", []string{migrationFolder})
+	// rm may fail if folder doesn't exist yet; ignore that error
+	_ = testSh(t, "rm", []string{"-r", migrationFolder})
+	if err := testSh(t, "mkdir", []string{migrationFolder}); err != nil {
+		t.Fatal("could not create migration folder:", err)
+	}
 }
 
 func writeMigration(t *testing.T, name, contents string) {
 	filename := path.Join(migrationFolder, name)
-	err := ioutil.WriteFile(filename, []byte(contents), 0644)
+	err := os.WriteFile(filename, []byte(contents), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write %s: %s", filename, err)
 	}

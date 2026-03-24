@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strconv"
@@ -77,9 +76,11 @@ func LoadConfig(config *Config, ctx argumentContext) error {
 }
 
 func (config *Config) populateFromFile(configFile string) {
-	contents, err := ioutil.ReadFile(configFile)
+	contents, err := os.ReadFile(configFile)
 	if err == nil {
-		json.Unmarshal(contents, &config)
+		if err := json.Unmarshal(contents, &config); err != nil {
+			fmt.Println("error parsing config file: ", err)
+		}
 	} else {
 		fmt.Println("error reading config file: ", err)
 	}
@@ -243,7 +244,7 @@ func (config *Config) validate() error {
 	}
 
 	if config.Format != "unix" && config.Format != "datetime" {
-		return errors.New(`Format must be "unix" or "datetime"`)
+		return errors.New(`format must be "unix" or "datetime"`)
 	}
 
 	if config.Format == "datetime" && config.ColumnType != "string" {

@@ -85,7 +85,9 @@ func TestDumpDefaults(t *testing.T) {
 			"dump-file": "dump.file.sql.gz",
 		},
 	}
-	LoadConfig(c, &dumpContext)
+	if err := LoadConfig(c, &dumpContext); err != nil {
+		t.Fatal("unexpected error from LoadConfig:", err)
+	}
 
 	if c.DumpConfig.DumpFile != "dump.file.sql" {
 		t.Fatal("dump config should strip '.gz' suffix, but was ", c.DumpConfig.DumpFile)
@@ -104,7 +106,9 @@ func TestDumpOverlays(t *testing.T) {
 	c.DumpConfig.DumpFile = "structval"
 	ctx.StringVals["dump-file"] = "stringval"
 
-	LoadConfig(c, ctx)
+	if err := LoadConfig(c, ctx); err != nil {
+		t.Fatal("unexpected error from LoadConfig:", err)
+	}
 
 	if c.DumpConfig.DumpFile != "stringval" {
 		t.Fatal("config's dump file should come from the context, but was", c.DumpConfig.DumpFile)
@@ -117,7 +121,9 @@ func TestDumpOverlays(t *testing.T) {
 	// should prefer the value in the struct, since
 	// nothing else is given
 	c.DumpConfig.DumpFile = "structval"
-	LoadConfig(c, ctx)
+	if err := LoadConfig(c, ctx); err != nil {
+		t.Fatal("unexpected error from LoadConfig:", err)
+	}
 
 	if c.DumpConfig.DumpFile != "structval" {
 		t.Fatal("config's dump file should not change, but was", c.DumpConfig.DumpFile)
