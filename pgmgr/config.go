@@ -55,7 +55,9 @@ func LoadConfig(config *Config, ctx argumentContext) error {
 	// load configuration from file first; then override with
 	// flags or env vars if they're present.
 	configFile := ctx.String("config-file")
-	config.populateFromFile(configFile)
+	if err := config.populateFromFile(configFile); err != nil {
+		return err
+	}
 
 	// apply defaults from Postgres environment variables, but allow
 	// them to be overridden in the next step
@@ -75,14 +77,16 @@ func LoadConfig(config *Config, ctx argumentContext) error {
 	return config.validate()
 }
 
-func (config *Config) populateFromFile(configFile string) {
+func (config *Config) populateFromFile(configFile string) error {
+	if configFile == "" {
+		return nil
+	}
 	contents, err := os.ReadFile(configFile)
-	if err == nil {
-		if err := json.Unmarshal(contents, &config); err != nil {
-			fmt.Println("error parsing config file: ", err)
-		}
-	} else {
-		fmt.Println("error reading config file: ", err)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(contents, &config); err != nil {
+		return err
 	}
 	if config.DumpFile != "" {
 		deprecatedDumpFieldWarning("dump-file")
@@ -92,6 +96,7 @@ func (config *Config) populateFromFile(configFile string) {
 		deprecatedDumpFieldWarning("seed-tables")
 		config.DumpConfig.IncludeTables = config.SeedTables
 	}
+	return nil
 }
 
 func (config *Config) populateFromPostgresVars() {
