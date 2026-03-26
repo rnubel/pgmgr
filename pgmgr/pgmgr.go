@@ -61,7 +61,7 @@ func Drop(c *Config) error {
 }
 
 // Dump dumps the schema and contents of the database to the dump file.
-func Dump(c *Config) error {
+func Dump(c *Config) (retErr error) {
 	if err := c.DumpToEnv(); err != nil {
 		return err
 	}
@@ -85,6 +85,11 @@ func Dump(c *Config) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if cerr := file.Close(); cerr != nil && retErr == nil {
+			retErr = cerr
+		}
+	}()
 
 	if _, err = file.Write(*schemaDump); err != nil {
 		return err
@@ -92,7 +97,7 @@ func Dump(c *Config) error {
 	if _, err = file.Write(*dataDump); err != nil {
 		return err
 	}
-	return file.Close()
+	return nil
 }
 
 // Load loads the database from the dump file using psql.
@@ -120,6 +125,7 @@ func Load(c *Config) error {
 		if err != nil {
 			return err
 		}
+		defer file.Close() //nolint:errcheck // superseded by explicit close below
 
 		if _, err = file.Write(*dumpSQL); err != nil {
 			return err
@@ -338,6 +344,7 @@ func applyMigrationByPsql(c *Config, m Migration, direction int) error {
 		return err
 	}
 	defer os.Remove(tmpfile.Name()) //nolint:errcheck // best-effort cleanup
+	defer tmpfile.Close()           //nolint:errcheck // superseded by explicit close below
 
 	if _, err := tmpfile.Write(contents); err != nil {
 		return err
