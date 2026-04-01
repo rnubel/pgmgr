@@ -19,6 +19,7 @@ type argumentContext interface {
 	Int(string) int
 	StringSlice(string) []string
 	Bool(string) bool
+	IsSet(string) bool
 }
 
 // Config stores the options used by pgmgr.
@@ -55,7 +56,7 @@ func LoadConfig(config *Config, ctx argumentContext) error {
 	// load configuration from file first; then override with
 	// flags or env vars if they're present.
 	configFile := ctx.String("config-file")
-	if err := config.populateFromFile(configFile); err != nil {
+	if err := config.populateFromFile(configFile, ctx.IsSet("config-file")); err != nil {
 		return err
 	}
 
@@ -77,12 +78,15 @@ func LoadConfig(config *Config, ctx argumentContext) error {
 	return config.validate()
 }
 
-func (config *Config) populateFromFile(configFile string) error {
+func (config *Config) populateFromFile(configFile string, explicit bool) error {
 	if configFile == "" {
 		return nil
 	}
 	contents, err := os.ReadFile(configFile)
 	if err != nil {
+		if !explicit && errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
 		return err
 	}
 	if err := json.Unmarshal(contents, &config); err != nil {

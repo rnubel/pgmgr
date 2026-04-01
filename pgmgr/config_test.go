@@ -3,6 +3,7 @@ package pgmgr
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -12,6 +13,7 @@ type TestContext struct {
 	IntVals         map[string]int
 	StringSliceVals map[string][]string
 	BoolVals        map[string]bool
+	IsSetVals       map[string]bool
 }
 
 func (t *TestContext) String(key string) string {
@@ -25,6 +27,9 @@ func (t *TestContext) StringSlice(key string) []string {
 }
 func (t *TestContext) Bool(key string) bool {
 	return t.BoolVals[key]
+}
+func (t *TestContext) IsSet(key string) bool {
+	return t.IsSetVals[key]
 }
 
 func TestDefaults(t *testing.T) {
@@ -191,5 +196,58 @@ func TestQuotedMigrationTable(t *testing.T) {
 	c.MigrationTable = "abc.def"
 	if c.quotedMigrationTable() != `"abc"."def"` {
 		t.Fatal(`Schema-qualified migration table should be "abc"."def", got`, c.quotedMigrationTable())
+	}
+}
+
+func TestMissingDefaultConfigFile(t *testing.T) {
+	// Simulate production: no .pgmgr.json in the working dir,
+	// config-file flag was NOT explicitly set by the user.
+	c := &Config{}
+	ctx := &TestContext{
+		StringVals: map[string]string{
+			"config-file": filepath.Join(t.TempDir(), ".pgmgr.json"),
+		},
+		IsSetVals: map[string]bool{
+			"config-file": false, // key distinction: user did not pass --config-file
+		},
+	}
+
+	if err := LoadConfig(c, ctx); err != nil {
+		t.Fatal("LoadConfig should succeed when default config file is missing, but got:", err)
+	}
+}
+
+func TestExplicitMissingConfigFileErrors(t *testing.T) {
+	c := &Config{}
+	ctx := &TestContext{
+		StringVals: map[string]string{
+			"config-file": filepath.Join(t.TempDir(), "explicit-missing.json"),
+		},
+		IsSetVals: map[string]bool{
+			"config-file": true, // user explicitly passed --config-file
+		},
+	}
+
+	if err := LoadConfig(c, ctx); err == nil {
+		t.Fatal("LoadConfig should fail when explicitly-given config file is missing")
+	}
+}
+
+func TestExplicitEnvVarMissingConfigFileErrors(t *testing.T) {
+	// When PGMGR_CONFIG_FILE env var is set to a path that doesn't exist,
+	// LoadConfig should fail — the user explicitly configured a path.
+	missingPath := filepath.Join(t.TempDir(), "from-env-var.json")
+	c := &Config{}
+	ctx := &TestContext{
+		StringVals: map[string]string{
+			"config-file": missingPath,
+		},
+		IsSetVals: map[string]bool{
+			"config-file": true, // urfave/cli sets IsSet=true when EnvVar is present
+		},
+	}
+
+	if err := LoadConfig(c, ctx); err == nil {
+		t.Fatal("LoadConfig should fail when config file path from env var does not exist")
 	}
 }
